@@ -180,7 +180,7 @@ pip install -e '.[dev]' -U
 
 You can run tests as shown below:
 ```shell
-pyest 
+pytest 
 ```
 or with tox however, I still need to fix migrations in the testapp to be wagtail 5.2 compliant
 ```
