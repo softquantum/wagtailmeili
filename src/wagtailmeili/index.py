@@ -1,0 +1,255 @@
+import logging
+from typing import Optional
+
+from django.core.serializers import serialize
+from django.db.models import Manager, Model, QuerySet
+from django.utils.encoding import force_str
+from meilisearch import Client
+from meilisearch.errors import MeilisearchApiError
+from wagtail.models import Collection, Page
+from wagtail.search import index as wagtail_index
+from wagtail.search.index import class_is_indexed
+
+from wagtailmeili.utils import check_for_task_successful_completion, model_is_skipped
+
+logger = logging.getLogger(__name__)
+
+
+class MeilisearchIndex:
+    """Class for MeiliSearch indexes based on NullIndex class interfaces.
+
+    Meilisearch uses the term "index" to refer to a group of documents with associated settings.
+    So basically an index is a searchable model in Wagtail.  It is comparable to a table in SQL.
+    An index is defined by a name (uid) and contains the following information:
+    - One primary key
+    - Customizable settings
+    - An arbitrary number of documents
+
+    Features:
+    - Model Skipping: Supports skipping specific models through the backend's skip_models list.
+      Models in this list will not be indexed.
+    - Field-based Skipping: Additional control through skip_models_by_field_value for
+      conditional skipping based on model fields values.
+
+    TODO: "id" may not be the primary key of the model yes/no ?
+    self.primary_key = model._meta.pk.name
+
+    """
+
+    def __init__(self, backend, model):
+        self.backend = backend
+        self.client = backend.client
+        self.model = model
+        self._name = model._meta.app_label.lower() + "_" + model.__name__.lower()  # noqa E501
+        self.name = self._name
+        self.primary_key = "id"
+        self.documents = []
+        self.index = self.get_index(self.name)
+
+    def get_index(self, uid) -> Optional[Client.index]:
+        """Get an index from MeiliSearch.
+
+        client.index(uid) create a local reference to an index identified by uid,
+        without doing an HTTP call. It returns a meilisearch.Index class.
+        """
+        self.index = self.client.index(uid)
+
+        return self.client.index(uid)
+
+    def add_model(self, model):
+        """Add an index: a group of documents with associated settings.
+
+        This method is used in update_index.py and therefore should be preserved in its format.
+        """
+
+        if model_is_skipped(model, self.backend.skip_models):
+            return None
+
+        if not class_is_indexed(model):
+            return None
+
+        try:
+            task = self.client.create_index(uid=self.name, options={"primaryKey": self.primary_key})
+            logger.info(f"add_model: Creating Index {self.name}.")
+        except MeilisearchApiError as err:
+            logger.error(f"add_model: Error creating index {self.name}: {err}")
+            return None
+
+        succeeded = check_for_task_successful_completion(self.client, task_uid=task.task_uid, timeout=300)
+
+        if succeeded:
+            self.update_index_settings()
+            return self.client.index(self.name)
+        else:
+            return None
+
+    def add_item(self, item) -> None:
+        """Add a document to the index.
+
+        If the index does not exist: If you try to add documents or settings to an index
+        that does not already exist, Meilisearch will automatically create it for you.
+        https://www.meilisearch.com/docs/learn/getting_started/indexes#implicit-index-creation
+
+        """
+        document = self.prepare_documents(self.model, items=item)
+
+        if document:
+            try:
+                has_documents = self.index.get_documents().total > 0
+                if has_documents:
+                    self.index.update_documents(documents=document)
+                else:
+                    self.index.add_documents(documents=document)
+            except MeilisearchApiError as err:
+                if "index_not_found" in str(err):
+                    self.index.add_documents(documents=document)
+                else:
+                    logger.error(f"Error adding/updating document: {err}")
+                    raise
+
+    def add_items(self, model, items):
+        """Add a list of documents (items) to the index."""
+        # update_index.py requires add_items to have these two arguments (model, chunk)
+        documents = self.prepare_documents(model, items=items)
+
+        if len(documents) > 0:
+            if self.index.get_documents().total > 0:
+                self.index.update_documents(documents=documents)
+            else:
+                self.index.add_documents(documents=documents)
+
+    def serialize_value(self, value) -> str | list | dict:
+        """Make sure `value` is something we can save in the index."""
+        if not value:
+            return ""
+        elif isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            return ", ".join(self.serialize_value(item) for item in value)
+        if isinstance(value, dict):
+            return ", ".join(self.serialize_value(item) for item in value.values())
+        if isinstance(value, QuerySet):
+            # is it worth it or should I return an empty value?
+            return serialize("json", value)
+        if isinstance(value, Manager):
+            # is it worth it or should I return an empty value?
+            return [self.serialize_value(item) for item in value.all()]
+        if isinstance(value, Collection):
+            # is it worth it or should I return an empty value?
+            return {"id": value.id, "name": value.name}
+        if callable(value):
+            return force_str(value())
+        return str(value)
+
+    def prepare_documents(self, model, items) -> list:
+        """Prepare documents for indexing."""
+        documents = []
+        search_fields = model.get_search_fields()
+
+        if not isinstance(items, list):
+            items = [items]
+
+        for item in items:
+            if self._should_skip(item, model, self.backend.skip_models_by_field_value):
+                continue
+
+            document = self._process_model_instance(instance=item, fields=search_fields)
+            if document:
+                documents.append(document)
+
+        return documents
+
+    def _should_skip(self, item, model, skipped_models_by_field_value):
+        """Check if an item should be skipped based on the model and skip_models_by_field_value."""
+
+        if model_is_skipped(model, self.backend.skip_models):
+            return True
+
+        model_key = f"{model._meta.app_label}.{model.__name__}".lower()
+        model_attributes = skipped_models_by_field_value.get(model_key)
+        if model_attributes:
+            attribute_value = getattr(item, model_attributes["field"], None)
+            if attribute_value == model_attributes["value"]:
+                logger.info(
+                        f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
+                )
+                return True
+        if isinstance(item, Page) and not item.live:
+            logger.info(f"Skipping {model.__name__} {item.id} because it is not live")
+            return True
+        return False
+
+    def _process_model_instance(self, instance, fields) -> dict | None:
+        """Recursively process a model instance for indexing."""
+        # exclude draft or unpublished pages for the instances with a live attribute
+        if getattr(instance, "live", True) is False:
+            return None
+
+        document = {"id": instance.pk}  # TODO: "id" may not be the primary key of the model?
+        for field in fields:
+            field_name = field.field_name
+            field_value = getattr(instance, field_name, None)
+
+            if isinstance(field, wagtail_index.SearchField):
+                document[field_name] = self.serialize_value(field_value)
+            elif isinstance(field, wagtail_index.FilterField):
+                document[field_name] = self.serialize_value(field_value)
+            elif isinstance(field, wagtail_index.RelatedFields):
+                if isinstance(field_value, (Manager, QuerySet)):  # ManyToManyField and OneToManyField
+                    related_objects = field_value.all()
+                    document[field_name] = [self._process_model_instance(obj, field.fields) for obj in related_objects]
+                elif isinstance(field_value, Model):  # ForeignKey
+                    document[field_name] = self._process_model_instance(field_value, field.fields)
+
+        return document
+
+    def delete_item(self, item) -> None:
+        """Delete a document from the index."""
+        self.index.delete_document(item)
+
+    def update_index_settings(self) -> None:
+        """Update index settings based on model's search fields."""
+        searchable_attributes = []
+        filterable_attributes = []
+        sortable_attributes = []
+
+        def collect_attributes(field_list, parent_field_name="") -> None:
+            for field in field_list:
+                field_name = f"{parent_field_name}.{field.field_name}" if parent_field_name else field.field_name
+
+                if isinstance(field, wagtail_index.SearchField):
+                    searchable_attributes.append(field_name)
+                elif isinstance(field, wagtail_index.FilterField):
+                    filterable_attributes.append(field_name)
+                elif isinstance(field, wagtail_index.RelatedFields):
+                    # Recursively collect attributes from related fields
+                    collect_attributes(field_list=field.fields, parent_field_name=field_name)
+
+        collect_attributes(self.model.get_search_fields())
+        if hasattr(self.model, "sortable_attributes"):
+            sortable_attributes = self.model.sortable_attributes
+            logger.info(f"Sortable attributes added for index {self.name}")
+
+        if hasattr(self.model, "ranking_rules"):
+            self.backend.ranking_rules.extend(self.model.ranking_rules)
+            logger.info(f"Ranking rules {self.model.ranking_rules} added for index {self.name}")
+            logger.info(f"Ranking rules are now {self.backend.ranking_rules}.")
+
+        index_settings = {
+            "rankingRules": self.backend.ranking_rules,
+            "stopWords": self.backend.stop_words,
+            "searchableAttributes": searchable_attributes,
+            "filterableAttributes": filterable_attributes,
+            "sortableAttributes": sortable_attributes,
+            "typoTolerance": {
+                "enabled": True,
+                "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 7},
+                "disableOnWords": [],
+                "disableOnAttributes": [],
+            },
+        }
+        try:
+            self.index.update_settings(index_settings)
+            logger.info(f"Settings updated for index {self.name}")
+        except MeilisearchApiError as err:
+            logger.error(f"Error updating settings for index {self.name}: {err}")
