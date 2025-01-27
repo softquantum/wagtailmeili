@@ -127,17 +127,25 @@ source .venv/bin/activate
 ```shell
 pip install -r requirements.txt
 ```
-5. Create a superuser (optional)
+5. add an .env file
+```dotenv
+MEILISEARCH_MASTER_KEY="your masterKey"
+```
+6. apply migrations
+```shell
+python manage.py migrate
+```
+7. Create a superuser (optional)
 ```shell
 python manage.py createsuperuser
 ```
-6. start wagtail
+8. load movies & start local web server
 ```shell
-python manage.py runserver
 python manage.py load_movies
+python manage.py runserver
 ```
-7. visit your meilisearch local instance: https://127.0.0.1:7700, give it your master-key.  You should see some movies loaded.
-8. update index (optional):
+9. visit your meilisearch local instance: https://127.0.0.1:7700, give it your master-key.  You should see some movies loaded.
+10. update index (optional):
 ```shell
 python manage.py update_index
 ```
@@ -180,5 +188,4 @@ tox
 ```
 
 ## License
-This project is released under the [BSD-3-Clause License](LICENSE).
-
+This project is released under the [3-Clause BSD License](LICENSE).
