@@ -2,6 +2,7 @@ import logging
 
 from .index import MeilisearchIndex
 from .utils import check_for_task_successful_completion, is_in_meilisearch
+from meilisearch.task import TaskInfo
 
 logger = logging.getLogger("search")
 
@@ -17,7 +18,7 @@ class MeilisearchRebuilder:
     """
 
     def __init__(self, index: MeilisearchIndex):
-        self.index = index
+        self.index: MeilisearchIndex = index
 
     def start(self) -> MeilisearchIndex:
         try:
@@ -39,20 +40,33 @@ class MeilisearchRebuilder:
             logger.error(f"Rebuilder: Error while getting index: {e}")
         return self.index
 
-    def finish(self):
+    def finish(self) -> TaskInfo:
+        """Finish the rebuild process by swapping indexes if needed.
+
+        Returns:
+            TaskInfo: The task information of the last operation performed
+                     (either swap or delete operation).
+
+        """
         logger.info("Rebuilder: Finishing the rebuild.")
         logger.info(f"Rebuilder: Checking if the new index exists: {self.index._name}_new")
+        task = None
+
         try:
-            if is_in_meilisearch(self.index.client, self.index._name + "_new"):
+            temp_index_name = self.index._name + "_new"
+            if is_in_meilisearch(self.index.client, temp_index_name):
                 logger.info("Rebuilder: Swapping indexes.")
                 task = self.index.client.swap_indexes([{"indexes": [self.index.name, self.index._name]}])  # noqa E501
                 succeeded = check_for_task_successful_completion(self.index.client, task.task_uid, timeout=300)
                 logger.info(f"Swap Succeeded? {succeeded}")
                 if succeeded:
-                    self.index.client.index(self.index._name + "_new").delete()   # noqa E501
-                    logger.info(f"Rebuilder: Swap index {self.index._name}_new deleted")  # noqa E501
+                    task = self.index.client.index(temp_index_name).delete()   # TODO: harmonize the calls either client.delete_index or index.delete()
+                    logger.info(f"Rebuilder: Swap index {temp_index_name} deleted")
         except Exception as e:
             logger.error(f"Rebuilder: Error while finsihing the rebuild: {e}")
+            raise
+
+        return task
 
     @staticmethod
     def reset_index(backend):

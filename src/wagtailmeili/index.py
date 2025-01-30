@@ -5,6 +5,7 @@ from django.core.serializers import serialize
 from django.db.models import Manager, Model, QuerySet
 from django.utils.encoding import force_str
 from meilisearch import Client
+from meilisearch.task import TaskInfo
 from meilisearch.errors import MeilisearchApiError
 from wagtail.models import Collection, Page
 from wagtail.search import index as wagtail_index
@@ -107,16 +108,19 @@ class MeilisearchIndex:
                     logger.error(f"Error adding/updating document: {err}")
                     raise
 
-    def add_items(self, model, items):
+    def add_items(self, model, items) -> TaskInfo | None:
         """Add a list of documents (items) to the index."""
         # update_index.py requires add_items to have these two arguments (model, chunk)
         documents = self.prepare_documents(model, items=items)
+        taskinfo = None
 
         if len(documents) > 0:
             if self.index.get_documents().total > 0:
-                self.index.update_documents(documents=documents)
+                taskinfo = self.index.update_documents(documents=documents)
             else:
-                self.index.add_documents(documents=documents)
+                taskinfo = self.index.add_documents(documents=documents)
+
+        return taskinfo
 
     def serialize_value(self, value) -> str | list | dict:
         """Make sure `value` is something we can save in the index."""
@@ -203,11 +207,12 @@ class MeilisearchIndex:
 
         return document
 
-    def delete_item(self, item) -> None:
+    def delete_item(self, item) -> TaskInfo:
         """Delete a document from the index."""
-        self.index.delete_document(item)
+        taskinfo = self.index.delete_document(item)
+        return taskinfo
 
-    def update_index_settings(self) -> None:
+    def update_index_settings(self) -> TaskInfo:
         """Update index settings based on model's search fields."""
         searchable_attributes = []
         filterable_attributes = []
@@ -248,8 +253,12 @@ class MeilisearchIndex:
                 "disableOnAttributes": [],
             },
         }
+
+        taskinfo = None
         try:
-            self.index.update_settings(index_settings)
+            taskinfo = self.index.update_settings(index_settings)
             logger.info(f"Settings updated for index {self.name}")
         except MeilisearchApiError as err:
             logger.error(f"Error updating settings for index {self.name}: {err}")
+
+        return taskinfo

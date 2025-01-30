@@ -5,6 +5,8 @@ import pytest
 from pathlib import Path
 from wagtail.models import Page, Locale
 from django.db import models
+
+from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp import settings as test_settings
 from wagtailmeili.testapp.models import MoviePage, MoviePageIndex
 
@@ -47,6 +49,42 @@ def meilisearch_params():
 def meilisearch_backend():
     """Real Meilisearch backend for integration tests"""
     return MeilisearchBackend(params=test_settings.WAGTAILSEARCH_BACKENDS["default"])
+
+
+@pytest.fixture
+def meilisearch_rebuilder(meilisearch_backend):
+    """Create a rebuilder with the real backend"""
+    index = meilisearch_backend.get_index_for_model(MoviePage)
+    return MeilisearchRebuilder(index)
+
+
+@pytest.fixture
+def test_movies():
+    """Create two test movies."""
+    from unittest.mock import Mock
+
+    # Create mock MoviePage instances with just the attributes we need
+    movie1 = Mock(spec=MoviePage)
+    movie1.pk = 1
+    movie1.title = "Gone with the wind"
+    movie1.slug = "gone-with-the-wind"
+    movie1.live = True
+
+    movie2 = Mock(spec=MoviePage)
+    movie2.pk = 2
+    movie2.title = "John Doe"
+    movie2.slug =  "john-doe"
+    movie2.live = True
+
+    # Mock the get_search_fields method on MoviePage
+    MoviePage.get_search_fields = Mock(return_value=[
+        Mock(
+            field_name='title',
+            **{'__class__.__name__': 'SearchField'}  # This makes isinstance(field, SearchField) work
+        )
+    ])
+
+    return [movie1, movie2]
 
 
 @pytest.fixture
