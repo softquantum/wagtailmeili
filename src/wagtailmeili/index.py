@@ -1,9 +1,11 @@
 import logging
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Any
 
 from django.core.serializers import serialize
 from django.db.models import Manager, Model, QuerySet
 from django.utils.encoding import force_str
+from enum import StrEnum, auto
 from meilisearch import Client
 from meilisearch.task import TaskInfo
 from meilisearch.errors import MeilisearchApiError
@@ -13,7 +15,13 @@ from wagtail.search.index import class_is_indexed
 
 from wagtailmeili.utils import check_for_task_successful_completion, model_is_skipped
 
+
 logger = logging.getLogger(__name__)
+
+
+class IndexOperationStatus(StrEnum):
+    SKIPPED: str = auto()
+    IS_NOT_INDEXED: str = auto()
 
 
 class MeilisearchIndex:
@@ -47,6 +55,14 @@ class MeilisearchIndex:
         self.documents = []
         self.index = self.get_index(self.name)
 
+    def _validate_model(self, model) -> IndexOperationStatus | None:
+        """Validate if the model should be indexed."""
+        if not class_is_indexed(model):
+            return IndexOperationStatus.IS_NOT_INDEXED
+        if model_is_skipped(model, self.backend.skip_models):
+            return IndexOperationStatus.SKIPPED
+        return None
+
     def get_index(self, uid) -> Optional[Client.index]:
         """Get an index from MeiliSearch.
 
@@ -57,23 +73,25 @@ class MeilisearchIndex:
 
         return self.client.index(uid)
 
-    def add_model(self, model):
+    def add_model(self, model) -> Any | None:
         """Add an index: a group of documents with associated settings.
 
-        This method is used in update_index.py and therefore should be preserved in its format.
+        This method is used in update_index.py and therefore its arguments should not change.
+
+        Returns:
+            Client.index or None: Returns the created index if successful, None otherwise
+
         """
 
-        if model_is_skipped(model, self.backend.skip_models):
-            return None
-
-        if not class_is_indexed(model):
+        validation_status = self._validate_model(model)
+        if validation_status:
             return None
 
         try:
             task = self.client.create_index(uid=self.name, options={"primaryKey": self.primary_key})
             logger.info(f"add_model: Creating Index {self.name}.")
-        except MeilisearchApiError as err:
-            logger.error(f"add_model: Error creating index {self.name}: {err}")
+        except MeilisearchApiError as e:
+            logger.error(f"add_model: Error creating index {self.name}: {e}")
             return None
 
         succeeded = check_for_task_successful_completion(self.client, task_uid=task.task_uid, timeout=300)
@@ -101,11 +119,11 @@ class MeilisearchIndex:
                     self.index.update_documents(documents=document)
                 else:
                     self.index.add_documents(documents=document)
-            except MeilisearchApiError as err:
-                if "index_not_found" in str(err):
+            except MeilisearchApiError as e:
+                if "index_not_found" in str(e):
                     self.index.add_documents(documents=document)
                 else:
-                    logger.error(f"Error adding/updating document: {err}")
+                    logger.error(f"Error adding/updating document: {e}")
                     raise
 
     def add_items(self, model, items) -> TaskInfo | None:
@@ -213,52 +231,77 @@ class MeilisearchIndex:
         return taskinfo
 
     def update_index_settings(self) -> TaskInfo:
-        """Update index settings based on model's search fields."""
-        searchable_attributes = []
-        filterable_attributes = []
-        sortable_attributes = []
+        """Update index settings based on model's search fields.
 
-        def collect_attributes(field_list, parent_field_name="") -> None:
-            for field in field_list:
-                field_name = f"{parent_field_name}.{field.field_name}" if parent_field_name else field.field_name
+        Returns:
+            TaskInfo | None: The task info if successful, None if an error occurred.
 
-                if isinstance(field, wagtail_index.SearchField):
-                    searchable_attributes.append(field_name)
-                elif isinstance(field, wagtail_index.FilterField):
-                    filterable_attributes.append(field_name)
-                elif isinstance(field, wagtail_index.RelatedFields):
-                    # Recursively collect attributes from related fields
-                    collect_attributes(field_list=field.fields, parent_field_name=field_name)
+        Raises:
+            MeilisearchApiError: If there's an error communicating with Meilisearch
+            ValueError: If the settings are invalid
 
-        collect_attributes(self.model.get_search_fields())
-        if hasattr(self.model, "sortable_attributes"):
-            sortable_attributes = self.model.sortable_attributes
-            logger.info(f"Sortable attributes added for index {self.name}")
-
-        if hasattr(self.model, "ranking_rules"):
-            self.backend.ranking_rules.extend(self.model.ranking_rules)
-            logger.info(f"Ranking rules {self.model.ranking_rules} added for index {self.name}")
-            logger.info(f"Ranking rules are now {self.backend.ranking_rules}.")
-
-        index_settings = {
-            "rankingRules": self.backend.ranking_rules,
-            "stopWords": self.backend.stop_words,
-            "searchableAttributes": searchable_attributes,
-            "filterableAttributes": filterable_attributes,
-            "sortableAttributes": sortable_attributes,
-            "typoTolerance": {
-                "enabled": True,
-                "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 7},
-                "disableOnWords": [],
-                "disableOnAttributes": [],
-            },
-        }
-
-        taskinfo = None
+        """
         try:
+            searchable_attributes = []
+            filterable_attributes = []
+            sortable_attributes = []
+
+            def collect_attributes(field_list, parent_field_name="") -> None:
+                for field in field_list:
+                    field_name = f"{parent_field_name}.{field.field_name}" if parent_field_name else field.field_name
+
+                    if isinstance(field, wagtail_index.SearchField):
+                        searchable_attributes.append(field_name)
+                    elif isinstance(field, wagtail_index.FilterField):
+                        filterable_attributes.append(field_name)
+                    elif isinstance(field, wagtail_index.RelatedFields):
+                        # Recursively collect attributes from related fields
+                        collect_attributes(field_list=field.fields, parent_field_name=field_name)
+
+            collect_attributes(self.model.get_search_fields())
+            if hasattr(self.model, "sortable_attributes"):
+                sortable_attributes = self.model.sortable_attributes
+                logger.info(f"Sortable attributes added for index {self.name}")
+
+            if hasattr(self.model, "ranking_rules"):
+                self.backend.ranking_rules.extend(self.model.ranking_rules)
+                logger.info(f"Ranking rules {self.model.ranking_rules} added for index {self.name}")
+                logger.info(f"Ranking rules are now {self.backend.ranking_rules}.")
+
+            index_settings = {
+                "rankingRules": self.backend.ranking_rules,
+                "stopWords": self.backend.stop_words,
+                "searchableAttributes": searchable_attributes,
+                "filterableAttributes": filterable_attributes,
+                "sortableAttributes": sortable_attributes,
+                "typoTolerance": {
+                    "enabled": True,
+                    "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 7},
+                    "disableOnWords": [],
+                    "disableOnAttributes": [],
+                },
+            }
+
             taskinfo = self.index.update_settings(index_settings)
             logger.info(f"Settings updated for index {self.name}")
-        except MeilisearchApiError as err:
-            logger.error(f"Error updating settings for index {self.name}: {err}")
+            return taskinfo
 
-        return taskinfo
+        except MeilisearchApiError as err:
+            error_message = f"Error updating settings for index {self.name}"
+            if hasattr(err, 'code'):
+                error_message += f" (Error code: {err.code})"
+            if hasattr(err, 'message'):
+                error_message += f": {err.message}"
+            else:
+                error_message += f": {str(err)}"
+
+            logger.error(error_message)
+
+            if hasattr(err, '__dict__'):
+                logger.debug(f"Detailed error information: {err.__dict__}")
+            return None
+
+        except Exception as err:
+            logger.error(f"Unexpected error updating settings for index {self.name}: {str(err)}")
+            logger.exception("Stack trace:")
+            return None

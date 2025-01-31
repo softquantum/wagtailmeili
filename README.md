@@ -14,7 +14,7 @@ A search backend for Wagtail using [MeiliSearch](https://github.com/meilisearch/
 
 ## Requirements
 Wagtailmeili requires the following:
-- Python >= 3.10
+- Python >= 3.11
 - Wagtail >= 5.2
 
 ## Installation

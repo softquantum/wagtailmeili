@@ -4,6 +4,7 @@ from wagtail.models import Page
 from wagtail.search import index
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
+from wagtail.search.index import Indexed
 
 
 class MoviePageIndex(Page):
@@ -76,3 +77,33 @@ class NonIndexedModel(models.Model):
         app_label = 'wagtailmeili_testapp'
 
 
+class Author(models.Model):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = 'wagtailmeili_testapp'
+
+
+class RelatedMoviePage(MoviePage):
+    author = models.ForeignKey(
+        Author,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='movies'
+    )
+    related_movies = models.ManyToManyField(
+        'self',
+        blank=True,
+        symmetrical=False,
+        related_name='related_to'
+    )
+
+    search_fields = MoviePage.search_fields + [
+        index.RelatedFields('author', [
+            index.SearchField('name'),
+        ]),
+        index.RelatedFields('related_movies', [
+            index.SearchField('title'),
+        ]),
+    ]

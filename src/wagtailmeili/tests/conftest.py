@@ -9,6 +9,7 @@ from django.db import models
 from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp import settings as test_settings
 from wagtailmeili.testapp.models import MoviePage, MoviePageIndex
+from wagtailmeili.utils import is_in_meilisearch
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,23 @@ def meilisearch_rebuilder(meilisearch_backend):
     """Create a rebuilder with the real backend"""
     index = meilisearch_backend.get_index_for_model(MoviePage)
     return MeilisearchRebuilder(index)
+
+
+@pytest.fixture
+def meilisearch_index(meilisearch_backend, clean_meilisearch_index):
+    """Create a MeilisearchIndex instance for testing."""
+    from wagtailmeili.testapp.models import MoviePage
+    index = meilisearch_backend.get_index_for_model(MoviePage)
+
+    # Create the index in Meilisearch
+    task = index.client.create_index(index.name)
+    index.client.wait_for_task(task.task_uid)
+
+    yield index
+
+    # Cleanup
+    if is_in_meilisearch(index.client, index.name):
+        index.client.delete_index(index.name)
 
 
 @pytest.fixture
@@ -139,3 +157,11 @@ def clean_meilisearch_index(meilisearch_backend):
     meilisearch_backend.delete_all_indexes()
     yield
     meilisearch_backend.delete_all_indexes()
+
+
+@pytest.fixture
+def original_ranking_rules(meilisearch_backend):
+    """Fixture to manage ranking rules state."""
+    original_rules = meilisearch_backend.ranking_rules.copy()
+    yield original_rules
+    meilisearch_backend.ranking_rules = original_rules
