@@ -35,6 +35,12 @@ def pytest_configure(config):
         print("Current sys.modules keys:", [k for k in sys.modules.keys() if 'wagtail' in k])
 
 
+@pytest.fixture(autouse=True)
+def setup_logging():
+    """Setup logging for all tests."""
+    logging.basicConfig(level=logging.INFO)
+
+
 @pytest.fixture
 def meilisearch_params():
     """Provide default parameters for initializing MeilisearchBackend."""
@@ -73,7 +79,7 @@ def test_movies():
     movie2 = Mock(spec=MoviePage)
     movie2.pk = 2
     movie2.title = "John Doe"
-    movie2.slug =  "john-doe"
+    movie2.slug = "john-doe"
     movie2.live = True
 
     # Mock the get_search_fields method on MoviePage

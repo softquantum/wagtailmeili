@@ -1,4 +1,5 @@
 # Wagtailmeili
+[![Version](https://img.shields.io/pypi/v/wagtailmeili.svg?style=flat)](https://pypi.python.org/pypi/wagtailmeili/)
 [![License](https://img.shields.io/badge/license-BSD-blue.svg?style=flat)](https://opensource.org/licenses/BSD-3-Clause)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 

@@ -10,6 +10,11 @@ class MeiliSearchConnectionException(Exception):
     pass
 
 
+class MeiliSearchRebuildException(Exception):
+    """Custom exception for rebuild process failures."""
+    pass
+
+
 class MeiliSearchModelIndexException(Exception):
     """Exception raised when there is an error getting a model Index."""
 
