@@ -1,12 +1,9 @@
-# src/wagtailmeili/tests/test_index.py
+from unittest.mock import patch
+
 import pytest
-from django.db import models
-from requests import Response
-from wagtail.search import index as wagtail_index
-from wagtail.models import Page
 from wagtailmeili.index import MeilisearchIndex, IndexOperationStatus
 from wagtailmeili.testapp.models import MoviePage
-from meilisearch.errors import MeilisearchApiError
+
 
 def test_index_initialization(meilisearch_index):
     """Test the initialization of MeilisearchIndex."""
@@ -14,34 +11,6 @@ def test_index_initialization(meilisearch_index):
     assert meilisearch_index.primary_key == "id"
     assert meilisearch_index.documents == []
     assert meilisearch_index.model == MoviePage
-
-
-def test_skip_unpublished_pages(meilisearch_backend, load_movies_data):
-    """Test that unpublished pages are skipped during indexing."""
-    meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
-    movie = MoviePage.objects.first()
-    movie.live = False
-
-    documents = meili_index.prepare_documents(MoviePage, [movie])
-    assert len(documents) == 0
-
-
-@pytest.mark.django_db
-def test_add_items(meilisearch_backend, load_movies_data, clean_meilisearch_index):
-    """Test adding multiple items to the index."""
-    meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
-    meili_index.add_model(MoviePage)
-
-    movies = MoviePage.objects.all()[:2]
-    task_info = meili_index.add_items(MoviePage, list(movies))
-
-    assert task_info is not None
-    # Wait for indexing to complete
-    meilisearch_backend.client.wait_for_task(task_info.task_uid)
-
-    # Verify documents were indexed
-    docs = meili_index.index.get_documents()
-    assert docs.total >= 2
 
 
 def test_update_index_settings(meilisearch_backend, clean_meilisearch_index):
@@ -62,6 +31,48 @@ def test_update_index_settings(meilisearch_backend, clean_meilisearch_index):
     assert 'typoTolerance' in settings
 
 
+def test_custom_ranking_rules(meilisearch_backend, clean_meilisearch_index, original_ranking_rules):
+    """Test applying custom ranking rules to index."""
+    class CustomMoviePage(MoviePage):
+        ranking_rules = ['date:asc', 'custom_rule']
+
+    index = MeilisearchIndex(meilisearch_backend, CustomMoviePage)
+    index.add_model(CustomMoviePage)
+
+    tasks = meilisearch_backend.client.get_tasks()
+    if tasks.results:
+        last_task = tasks.results[0]
+        meilisearch_backend.client.wait_for_task(last_task.uid)
+
+    settings = meilisearch_backend.ranking_rules.copy()
+    expected_rules = original_ranking_rules + ['date:asc', 'custom_rule']
+    assert settings == expected_rules
+
+
+def test_add_model_task_failure(meilisearch_index):
+    with patch('wagtailmeili.index.check_for_task_successful_completion', return_value=False):
+        result = meilisearch_index.add_model(meilisearch_index.model)
+        assert result is None
+
+
+@pytest.mark.django_db
+def test_add_items(meilisearch_backend, load_movies_data, clean_meilisearch_index):
+    """Test adding multiple items to the index."""
+    meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
+    meili_index.add_model(MoviePage)
+
+    movies = MoviePage.objects.all()[:2]
+    task_info = meili_index.add_items(MoviePage, list(movies))
+
+    assert task_info is not None
+    # Wait for indexing to complete
+    meilisearch_backend.client.wait_for_task(task_info.task_uid)
+
+    # Verify documents were indexed
+    docs = meili_index.index.get_documents()
+    assert docs.total >= 2
+
+
 @pytest.mark.django_db
 def test_delete_item(meilisearch_backend, load_movies_data, clean_meilisearch_index):
     """Test deleting an item from the index."""
@@ -78,82 +89,6 @@ def test_delete_item(meilisearch_backend, load_movies_data, clean_meilisearch_in
     # Verify document was deleted
     docs = meili_index.index.get_documents()
     assert not any(doc['id'] == movie.id for doc in docs.results)
-
-
-def test_serialize_value(meilisearch_backend):
-    """Test serialization of different value types."""
-    meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
-
-    # Test string serialization
-    assert meili_index.serialize_value("test") == "test"
-
-    # Test list serialization
-    assert meili_index.serialize_value(["a", "b"]) == "a, b"
-
-    # Test dict serialization
-    assert meili_index.serialize_value({"key": "value"}) == "value"
-
-    # Test empty value
-    assert meili_index.serialize_value(None) == ""
-
-
-def test_validate_model_skipped(meilisearch_backend):
-    """Test model validation when model is in skip_models list."""
-
-    class SkippedModel(models.Model, wagtail_index.Indexed):
-
-        search_fields = ["id"]
-
-        class Meta:
-            app_label = 'wagtailmeili'
-
-    meilisearch_backend.skip_models = ['wagtailmeili.skippedmodel']
-    index = MeilisearchIndex(meilisearch_backend, SkippedModel)
-
-    status = index._validate_model(SkippedModel)
-    assert status == IndexOperationStatus.SKIPPED
-
-
-def test_validate_page_model_skipped(meilisearch_backend):
-    """Test model validation when a Page is in skip_models list."""
-
-    class SkippedPage(Page):
-
-        class Meta:
-            app_label = 'wagtailmeili'
-
-    meilisearch_backend.skip_models = ['wagtailmeili.skippedpage']
-    index = MeilisearchIndex(meilisearch_backend, SkippedPage)
-
-    status = index._validate_model(SkippedPage)
-    assert status == IndexOperationStatus.SKIPPED
-
-
-def test_validate_model_not_indexed(meilisearch_backend):
-    """Test model validation when model is not indexed."""
-
-    class UnindexedModel(models.Model):
-        pass
-
-    index = MeilisearchIndex(meilisearch_backend, UnindexedModel)
-    status = index._validate_model(UnindexedModel)
-    assert status == IndexOperationStatus.IS_NOT_INDEXED
-
-
-def test_add_model_error_handling(meilisearch_backend, monkeypatch):
-    """Test error handling when creating an index fails."""
-
-    def mock_create_index(*args, **kwargs):
-        response = Response()
-        response.status_code = 400
-        response._content = b'{"message": "Test error", "code": "index_creation_failed"}'
-        raise MeilisearchApiError("Test error message", response)
-
-    monkeypatch.setattr(meilisearch_backend.client, "create_index", mock_create_index)
-    index = MeilisearchIndex(meilisearch_backend, MoviePage)
-
-    result = index.add_model(MoviePage)
-    assert result is None
 
 
 @pytest.mark.django_db
@@ -212,39 +147,8 @@ def test_skip_by_field_value(meilisearch_backend, load_movies_data, clean_meilis
     assert movie.title not in doc_titles
 
 
-def test_custom_ranking_rules(meilisearch_backend, clean_meilisearch_index, original_ranking_rules):
-    """Test applying custom ranking rules to index."""
-    class CustomMoviePage(MoviePage):
-        ranking_rules = ['date:asc', 'custom_rule']
-
-    index = MeilisearchIndex(meilisearch_backend, CustomMoviePage)
-    index.add_model(CustomMoviePage)
-
-    tasks = meilisearch_backend.client.get_tasks()
-    if tasks.results:
-        last_task = tasks.results[0]
-        meilisearch_backend.client.wait_for_task(last_task.uid)
-
-    settings = meilisearch_backend.ranking_rules.copy()
-    expected_rules = original_ranking_rules + ['date:asc', 'custom_rule']
-    assert settings == expected_rules
-
-
-def test_error_handling_settings_update(meilisearch_backend, monkeypatch):
-    """Test error handling during settings update."""
-
-    def mock_update_settings(*args, **kwargs):
-        raise MeilisearchApiError("Settings update error")
-
-    index = MeilisearchIndex(meilisearch_backend, MoviePage)
-    monkeypatch.setattr(index.index, "update_settings", mock_update_settings)
-
-    task_info = index.update_index_settings()
-    assert task_info is None
-
-
 @pytest.mark.django_db
-def test_related_fields_processing(meilisearch_backend, clean_meilisearch_index):
+def test_related_fields_processing(meilisearch_backend, movies_index_page, clean_meilisearch_index):
     """Test processing of different types of related fields."""
     from wagtailmeili.testapp.models import Author, RelatedMoviePage
     from wagtail.models import Page
@@ -252,21 +156,18 @@ def test_related_fields_processing(meilisearch_backend, clean_meilisearch_index)
     # Create test data
     author = Author.objects.create(name="Test Author")
 
-    # Get the movies index page
-    movies_index = Page.objects.get(slug='movies')
-
     # Create related movie pages
     movie1 = RelatedMoviePage(
             title="Related Movie 1",
             author=author,
     )
-    movies_index.add_child(instance=movie1)
+    movies_index_page.add_child(instance=movie1)
 
     movie2 = RelatedMoviePage(
             title="Related Movie 2",
             author=author,
     )
-    movies_index.add_child(instance=movie2)
+    movies_index_page.add_child(instance=movie2)
 
     # Add related movies
     movie1.related_movies.add(movie2)

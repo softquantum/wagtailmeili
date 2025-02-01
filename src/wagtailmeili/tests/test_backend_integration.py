@@ -49,15 +49,13 @@ def test_backend_search_integration(meilisearch_backend, load_movies_data, clean
 
 
 @pytest.mark.django_db
-def test_skip_models(meilisearch_backend):
+def test_skip_models(meilisearch_backend, movies_index_page):
     """Test that models in skip_models are not indexed.
 
     This test verifies the skip_models functionality through Wagtail's search interface,
     ensuring that models listed in skip_models are completely excluded from indexing.
     """
-
     # test data
-    movies_index_page = MoviePageIndex.objects.first()
     movie = MoviePage(
         title="Star Wars",
         slug="star-wars",

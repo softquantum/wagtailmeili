@@ -6,6 +6,7 @@ from pathlib import Path
 from wagtail.models import Page, Locale
 from django.db import models
 
+from wagtailmeili.index import MeilisearchIndex
 from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp import settings as test_settings
 from wagtailmeili.testapp.models import MoviePage, MoviePageIndex
@@ -67,17 +68,9 @@ def meilisearch_rebuilder(meilisearch_backend):
 
 @pytest.fixture
 def meilisearch_index(meilisearch_backend, clean_meilisearch_index):
-    """Create a MeilisearchIndex instance for testing."""
     from wagtailmeili.testapp.models import MoviePage
-    index = meilisearch_backend.get_index_for_model(MoviePage)
-
-    # Create the index in Meilisearch
-    task = index.client.create_index(index.name)
-    index.client.wait_for_task(task.task_uid)
-
+    index = MeilisearchIndex(backend=meilisearch_backend, model=MoviePage)
     yield index
-
-    # Cleanup
     if is_in_meilisearch(index.client, index.name):
         index.client.delete_index(index.name)
 
@@ -112,15 +105,33 @@ def test_movies():
 
 
 @pytest.fixture
-def load_movies_data(db):
+def movies_index_page():
+    """Create a movies index page."""
+    default_locale = Locale.objects.get_or_create(language_code='en')[0]
+
+    root_page = Page.get_first_root_node()
+    if not root_page:
+        root_page = Page.add_root(title="Root")
+        root_page.save()
+
+    try:
+        movies_index_page = MoviePageIndex.objects.get(slug='movies')
+    except MoviePageIndex.DoesNotExist:
+        movies_index_page = MoviePageIndex(
+                title="Movies",
+                slug="movies",
+                locale=default_locale
+        )
+        root_page.add_child(instance=movies_index_page)
+
+    return movies_index_page
+
+
+@pytest.fixture
+def load_movies_data(db, movies_index_page):
     """Load the movies data into the database."""
     default_locale = Locale.objects.get_or_create(language_code='en')[0]
-    print(f"Default locale: {default_locale}")
 
-    movies_index_page = MoviePageIndex.objects.get(slug='movies')
-    print(f"Movies index page: {movies_index_page}")
-
-    # Read the JSON file
     try:
         with open(MOVIES_FILE) as f:
             movies_data = json.load(f)

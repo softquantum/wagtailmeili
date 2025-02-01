@@ -1,0 +1,65 @@
+name: Run tests and upload coverage
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    services:
+      meilisearch:
+        image: getmeili/meilisearch:v1.5
+        ports:
+          - 7700:7700
+        env:
+          MEILI_MASTER_KEY: correctMasterKey
+          MEILI_NO_ANALYTICS: true
+        options: >-
+          --health-cmd="curl -f http://localhost:7700/health"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+          python -m pip install tox tox-gh-actions
+
+      - name: Test with tox
+        run: tox
+        env:
+          MEILISEARCH_URL: http://localhost
+          MEILISEARCH_PORT: 7700
+          MEILISEARCH_MASTER_KEY: correctMasterKey
+          WAGTAILADMIN_BASE_URL: http://example.com
+          TESTS_USE_IN_MEMORY_DATABASE: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          files: ./coverage.xml
+          flags: unittests-${{ matrix.python-version }}
+          name: Python ${{ matrix.python-version }}
+          verbose: true

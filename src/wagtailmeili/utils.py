@@ -29,7 +29,7 @@ def model_is_skipped(model: Type[Model], skip_models: list[str]) -> bool:
         raise TypeError("Expected a Django/Wagtail Model class")
 
     model_identifier = f"{model._meta.app_label}.{model.__name__}".lower()
-    return model_identifier in skip_models
+    return model_identifier in [item.lower() for item in skip_models]
 
 
 def check_for_task_successful_completion(client, task_uid, timeout=300):

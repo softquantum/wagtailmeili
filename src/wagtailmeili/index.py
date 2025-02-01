@@ -55,7 +55,7 @@ class MeilisearchIndex:
         self.documents = []
         self.index = self.get_index(self.name)
 
-    def _validate_model(self, model) -> IndexOperationStatus | None:
+    def _is_not_indexable(self, model) -> IndexOperationStatus | None:
         """Validate if the model should be indexed."""
         if not class_is_indexed(model):
             return IndexOperationStatus.IS_NOT_INDEXED
@@ -79,28 +79,26 @@ class MeilisearchIndex:
         This method is used in update_index.py and therefore its arguments should not change.
 
         Returns:
-            Client.index or None: Returns the created index if successful, None otherwise
+                Client.index if the index is successfully created and configured, else None.
 
         """
 
-        validation_status = self._validate_model(model)
-        if validation_status:
+        if self._is_not_indexable(model):
             return None
 
         try:
             task = self.client.create_index(uid=self.name, options={"primaryKey": self.primary_key})
-            logger.info(f"add_model: Creating Index {self.name}.")
-        except MeilisearchApiError as e:
-            logger.error(f"add_model: Error creating index {self.name}: {e}")
-            return None
-
-        succeeded = check_for_task_successful_completion(self.client, task_uid=task.task_uid, timeout=300)
-
-        if succeeded:
+            logger.info(f"Creating index '{self.name}' by adding model. Task UID: {task.task_uid}")
+            if not check_for_task_successful_completion(self.client, task_uid=task.task_uid, timeout=300):
+                logger.error(f"Index creation for '{self.name}' was not successful.")
+                return None
             self.update_index_settings()
             return self.client.index(self.name)
-        else:
-            return None
+
+        except MeilisearchApiError as e:
+            logger.error(f"add_model: Error creating index {self.name}: {e}")
+
+        return None
 
     def add_item(self, item) -> None:
         """Add a document to the index.
@@ -255,7 +253,6 @@ class MeilisearchIndex:
                     elif isinstance(field, wagtail_index.FilterField):
                         filterable_attributes.append(field_name)
                     elif isinstance(field, wagtail_index.RelatedFields):
-                        # Recursively collect attributes from related fields
                         collect_attributes(field_list=field.fields, parent_field_name=field_name)
 
             collect_attributes(self.model.get_search_fields())

@@ -33,7 +33,7 @@ def get_complete_version(version=None):
     check for correctness of the tuple provided.
     """
     if version is None:
-        from wagtailmeili.version import VERSION as version
+        from wagtailmeili import VERSION as version
     else:
         if len(version) != 5:
             raise ValueError("wagtailmeili version number must be a 5-tuple")
