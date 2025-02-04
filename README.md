@@ -107,11 +107,13 @@ class MySuperPage(Page):
 {% get_matches_position result %}
 ```
 
-## Roadmap (unsorted)
-- Adding tests
-- Exploring Meilisearch and bringing more of its features for Wagtail
-- Getting a leaner implementation (looking at Autocomplete and rebuilder)
-- Giving more love to the Sample project with a frontend
+## Roadmap before 1.0.0 (unsorted)
+-[x] ~~Adding tests~~
+-[ ] Refactoring index.py to be with easier testing
+-[ ] Exploring Meilisearch and bringing more of its features for Wagtail
+-[ ] Getting a leaner implementation (looking at Autocomplete and rebuilder)
+-[ ] Giving more love to the Sample project with a frontend
+-[ ] official documentation
 
 ## Sample Project: WMDB
 The Wagtail Movie Database (WMDB) is a sample project for testing purposes. To run the project, follow these steps:
