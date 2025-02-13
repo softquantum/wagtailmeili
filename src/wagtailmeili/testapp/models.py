@@ -6,6 +6,8 @@ from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
 from wagtail.search.index import Indexed
 
+from wagtailmeili.manager import MeilisearchModelManager
+
 
 class MoviePageIndex(Page):
     # parent page type should be the homepage
@@ -44,6 +46,14 @@ class MoviePage(Page):
         index.FilterField('genres'),
         index.FilterField('release_date'),
     ]
+
+
+class MoviePageWithManager(MoviePage):
+
+    objects = MeilisearchModelManager()
+
+    class Meta:
+        proxy = True
 
 
 class ReviewPage(Page):

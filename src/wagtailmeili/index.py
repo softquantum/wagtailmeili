@@ -49,7 +49,11 @@ class MeilisearchIndex:
         self.backend = backend
         self.client = backend.client
         self.model = model
-        self._name = model._meta.app_label.lower() + "_" + model.__name__.lower()  # noqa E501
+        if model._meta.proxy:
+            base_model = model._meta.proxy_for_model  # noqa E501
+            self._name = base_model._meta.app_label.lower() + "_" + base_model.__name__.lower()  # noqa E501
+        else:
+            self._name = model._meta.app_label.lower() + "_" + model.__name__.lower()  # noqa E501
         self.name = self._name
         self.primary_key = "id"
         self.documents = []

@@ -11,10 +11,10 @@ from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp import settings as test_settings
 from wagtailmeili.testapp.models import MoviePage, MoviePageIndex
 from wagtailmeili.utils import is_in_meilisearch
+from wagtailmeili.backend import MeilisearchBackend
 
 logger = logging.getLogger(__name__)
 
-from wagtailmeili.backend import MeilisearchBackend
 
 # Update the fixture path
 MOVIES_FILE = Path(__file__).parent.parent / "testapp" / "fixtures" / "movies_selection.json"
@@ -67,12 +67,13 @@ def meilisearch_rebuilder(meilisearch_backend):
 
 
 @pytest.fixture
-def meilisearch_index(meilisearch_backend, clean_meilisearch_index):
+def meilisearch_index(meilisearch_backend):
     from wagtailmeili.testapp.models import MoviePage
     index = MeilisearchIndex(backend=meilisearch_backend, model=MoviePage)
     yield index
-    if is_in_meilisearch(index.client, index.name):
-        index.client.delete_index(index.name)
+    meilisearch_backend.delete_all_indexes()
+    # if is_in_meilisearch(index.client, index.name):
+    #     index.client.delete_index(index.name)
 
 
 @pytest.fixture

@@ -157,8 +157,8 @@ class MeilisearchBackend(BaseSearchBackend):
     def search(self, query, model_or_queryset, fields=None, operator=None, order_by_relevance=True, opt_params=None,):
         """Search for a query string in the index.
 
-        No change was made from the BaseSearchBackend.search() method.
-        Copied here for convenience.
+        from the BaseSearchBackend.search() method we add the opt_params parameter.
+
         """
         return self._search(
             self.query_compiler_class,
