@@ -287,9 +287,11 @@ RANKING_RULES = [
 
 SKIP_MODELS = []
 
+# We already skip pages that are not live by default.
+# This is just an example of how to skip models based on a field value.
 SKIP_MODELS_BY_FIELD_VALUE = {
-    "wagtailcore.Page": {
-        "field": "live",
-        "value": False,
-    },
+    # "app.Model": {
+    #     "field": "live",
+    #     "value": False,
+    # },
 }

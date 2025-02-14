@@ -189,8 +189,12 @@ class MeilisearchIndex:
         if model_is_skipped(model, self.backend.skip_models):
             return True
 
-        model_key = f"{model._meta.app_label}.{model.__name__}".lower()
+        model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
         model_attributes = skipped_models_by_field_value.get(model_key)
+        if isinstance(item, Page) and not item.live:
+            logger.info(f"Skipping {model.__name__} {item.id} because it is not live")
+            return True
+
         if model_attributes:
             attribute_value = getattr(item, model_attributes["field"], None)
             if attribute_value == model_attributes["value"]:
@@ -198,9 +202,6 @@ class MeilisearchIndex:
                         f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
                 )
                 return True
-        if isinstance(item, Page) and not item.live:
-            logger.info(f"Skipping {model.__name__} {item.id} because it is not live")
-            return True
         return False
 
     def _process_model_instance(self, instance, fields) -> dict | None:
