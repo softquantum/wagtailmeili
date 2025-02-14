@@ -289,7 +289,7 @@ SKIP_MODELS = []
 
 SKIP_MODELS_BY_FIELD_VALUE = {
     "wagtailcore.Page": {
-        "attribute": "live",
+        "field": "live",
         "value": False,
     },
 }
