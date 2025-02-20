@@ -13,6 +13,11 @@ A search backend for Wagtail using [MeiliSearch](https://github.com/meilisearch/
 > [!TIP]  
 > If you need support or require help with a Wagtail project, you can hire me 😊
 
+## Introduction
+en - https://softquantum.com/resources/wagtailmeili-integrating-a-blazing-fast-search-engine-with-wagtail
+
+fr - https://softquantum.com/fr/ressources/wagtailmeili-integrer-un-moteur-de-recherche-rapide-avec-wagtail/
+
 ## Requirements
 Wagtailmeili requires the following:
 - Python >= 3.11
