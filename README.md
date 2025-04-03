@@ -39,12 +39,15 @@ INSTALLED_APPS = [
     # ...
 ]
 ```
-add the search backend to your `WAGTAILSEARCH_BACKENDS`
+add the search backend 'meilisearch' to your `WAGTAILSEARCH_BACKENDS`
+> [!CAUTION] 
+> Leave the 'default' backend for the admin as you don't want to depend only on what was indexed in meilisearch
+> Different use cases to consider so still work in progress. 
 ```python
 import os
 
 WAGTAILSEARCH_BACKENDS = {
-    "default": {
+    "meilisearch": {
         "BACKEND": "wagtailmeili.backend",
         "HOST":  os.environ.get("MEILISEARCH_HOST", "http://127.0.0.1"),
         "PORT": os.environ.get("MEILISEARCH_PORT", "7700"),
@@ -54,6 +57,9 @@ WAGTAILSEARCH_BACKENDS = {
         # "SKIP_MODELS": ...
         # "SKIP_MODELS_BY_FIELD_VALUE": ...
     },
+    "default": {
+        "BACKEND": "wagtail.search.backends.database",
+    }
 }
 ```
 ## Features
@@ -63,7 +69,7 @@ WAGTAILSEARCH_BACKENDS = {
 * SKIP_MODELS: "skip_models" is a list of models that you want to skip from indexing no matter the model setup.
 ```python
 WAGTAILSEARCH_BACKENDS = {
-    "default": {
+    "meilisearch": {
         "SKIP_MODELS": ["app_label.Model1", "app_label.Model2",],
         # ...
     }
@@ -72,7 +78,7 @@ WAGTAILSEARCH_BACKENDS = {
 * SKIP_MODELS_BY_FIELD_VALUE: A convenient way to skip instances based on attributes
 ```python
 WAGTAILSEARCH_BACKENDS = {
-    "default": {
+    "meilisearch": {
         # add this to not index pages that are not published for example
         "SKIP_MODELS_BY_FIELD_VALUE": {
             "wagtailmeili_testapp.MoviePage": {
@@ -87,13 +93,31 @@ WAGTAILSEARCH_BACKENDS = {
 
 ### Model fields
 
+In any model you will be doing a search on with Meilisearch, add the page or model manager.  
+It will use the correct backend when doing something like `MySuperPage.objects.search()`.
+```python
+from wagtail.models import Page
+from django.db import models
+from wagtailmeili.manager import MeilisearchPageManager, MeilisearchModelManager
+
+class MySuperPage(Page):
+    """A Super Page to do incredible things indexed in Meilisearch."""
+ 
+    objects = MeilisearchPageManager()
+
+class MySuperModel(models.Model):
+    """A Super Model to do incredible things indexed in Meilisearch."""
+ 
+    objects = MeilisearchModelManager()
+```
+
 To declare **_sortable attributes_** or add **_ranking rules_** for the model, just add, for example:
 ```python
 from wagtail.models import Page
 
 
 class MySuperPage(Page):
-    """A Super Page to do incredible things."""
+    """A Super Page to do incredible things indexed in Meilisearch."""
     
     sortable_attributes = [
         "published_last_timestamp", 

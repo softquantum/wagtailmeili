@@ -4,9 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
-## [0.3.2] - 2025-04-03
+## [0.3.3] - 2025-04-03
 ### Fixed
-- removed override of get_query in class MeilisearchAutocompleteQueryCompiler
+- MeilisearchAutocompleteQueryCompiler had the wrong matching strategy
+- MeilisearchAutocompleteQueryCompiler str query type
+
+### Changed
+Make sure you add either MeilisearchModelManager or MeilisearchPageManager for the models you will search with meilisearch
+
+- WAGTAILSEARCH_BACKENDS needs a meilisearch and keep the default to database (see README)
+
 
 ## [0.3.0] - 2025-02-13
 ### Added

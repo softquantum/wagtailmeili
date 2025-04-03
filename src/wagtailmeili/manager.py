@@ -7,14 +7,14 @@ from wagtail.models import PageManager, PageQuerySet
 class MeiliSearchQuerySetMixin:
     """Mixin for MeiliSearchQuerySet.
 
-    The method get_search_backend() without arguments
-    defaults to the default search backend configured for Wagtail
+    The method get_search_backend()
+    defaults to the 'meilisearch' search backend configured for Wagtail
     """
 
     def search(self, query, fields=None, operator=None, order_by_relevance=True, opt_params=None):
         from wagtail.search.backends import get_search_backend
 
-        search_backend = get_search_backend()  # takes the default search backend
+        search_backend = get_search_backend(backend="meilisearch")
         return search_backend.search(
             query,
             self,
@@ -40,4 +40,4 @@ class MeiliSearchPageQuerySet(MeiliSearchQuerySetMixin, PageQuerySet):
 MeilisearchModelManager = Manager.from_queryset(MeiliSearchModelQuerySet)
 
 
-MeiliSearchPageManager = PageManager.from_queryset(MeiliSearchPageQuerySet)
+MeilisearchPageManager = PageManager.from_queryset(MeiliSearchPageQuerySet)

@@ -164,5 +164,16 @@ class MeilisearchAutocompleteQueryCompiler(MeilisearchQueryCompiler):
 
         self.opt_params.update({
             "attributesToSearchOn": self.searchable_fields,
-            "prefix": True  # Enable prefix matching for autocomplete
         })
+
+    def get_query(self):
+        if isinstance(self.query, MatchAll):
+            return ""
+        elif isinstance(self.query, PlainText):
+            return self.query.query_string
+        elif isinstance(self.query, str):
+            return self.query
+        else:
+            raise NotImplementedError(
+                f"`{self.query.__class__.__name__}` is not supported for autocomplete queries."
+            )

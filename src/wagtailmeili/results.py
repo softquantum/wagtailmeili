@@ -78,7 +78,6 @@ class MeilisearchResults(BaseSearchResults):
                     "attributesToSearchOn": ["*"],  # array of strings
                 }
         """
-        # if self._results_cache is None:
         query_string = self.query_compiler.get_query()
 
         # Execute the search

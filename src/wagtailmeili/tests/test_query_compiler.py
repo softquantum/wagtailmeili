@@ -170,7 +170,6 @@ class TestMeilisearchAutocompleteQueryCompiler:
         assert compiler.searchable_fields == ['title']
         assert compiler.opt_params == {
             'attributesToSearchOn': ['title'],
-            'prefix': True
         }
 
     def test_init_without_fields(self, mock_model, meilisearch_backend):
@@ -182,7 +181,6 @@ class TestMeilisearchAutocompleteQueryCompiler:
         assert compiler.searchable_fields == ['title']
         assert compiler.opt_params == {
             'attributesToSearchOn': ['title'],
-            'prefix': True
         }
 
     def test_get_query_matchall(self, mock_model, meilisearch_backend):
@@ -200,3 +198,26 @@ class TestMeilisearchAutocompleteQueryCompiler:
             fields=None
         )
         assert compiler.get_query() == "test"
+
+    def test_get_query_string(self, mock_model, meilisearch_backend):
+        compiler = MeilisearchAutocompleteQueryCompiler(
+                queryset=type('MockQuerySet', (), {'model': mock_model}),
+                query="test string",
+                fields=None
+        )
+        assert compiler.get_query() == "test string"
+
+    def test_get_query_unsupported(self, mock_model, meilisearch_backend):
+        # Using a mock object that is neither MatchAll, PlainText, nor str
+        unsupported_query = type('UnsupportedQuery', (), {})()
+        compiler = MeilisearchAutocompleteQueryCompiler(
+                queryset=type('MockQuerySet', (), {'model': mock_model}),
+                query=unsupported_query,
+                fields=None
+        )
+        with pytest.raises(NotImplementedError) as excinfo:
+            compiler.get_query()
+
+        # Verify the error message contains the name of the unsupported class
+        assert "UnsupportedQuery" in str(excinfo.value)
+        assert "is not supported for autocomplete queries" in str(excinfo.value)
