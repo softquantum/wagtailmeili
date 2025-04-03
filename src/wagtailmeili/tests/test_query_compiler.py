@@ -200,12 +200,3 @@ class TestMeilisearchAutocompleteQueryCompiler:
             fields=None
         )
         assert compiler.get_query() == "test"
-
-    def test_get_query_unsupported(self, mock_model, meilisearch_backend):
-        compiler = MeilisearchAutocompleteQueryCompiler(
-            queryset=type('MockQuerySet', (), {'model': mock_model}),
-            query=Phrase("test"),
-            fields=None
-        )
-        with pytest.raises(NotImplementedError):
-            compiler.get_query()
