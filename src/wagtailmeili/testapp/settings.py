@@ -79,7 +79,7 @@ ALLOWED_HOSTS = ["*"]
 
 WAGTAIL_SITE_NAME = "Test Site"
 WAGTAILSEARCH_BACKENDS = {
-    "default": {
+    "meilisearch": {
         "BACKEND": "wagtailmeili.backend",
         "HOST": config("MEILISEARCH_URL", "http://localhost"),
         "PORT": config("MEILISEARCH_PORT", 7700, cast=int),
@@ -91,7 +91,10 @@ WAGTAILSEARCH_BACKENDS = {
                 "value": "Return of the Jedi",
             },
         },
-    }
+    },
+    "default": {
+        "BACKEND": "wagtail.search.backends.database",
+    },
 }
 
 WAGTAILADMIN_BASE_URL = config("WAGTAILADMIN_BASE_URL", "http://example.com")

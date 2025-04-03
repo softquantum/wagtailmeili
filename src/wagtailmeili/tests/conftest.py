@@ -4,13 +4,11 @@ import pytest
 
 from pathlib import Path
 from wagtail.models import Page, Locale
-from django.db import models
 
 from wagtailmeili.index import MeilisearchIndex
 from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp import settings as test_settings
 from wagtailmeili.testapp.models import MoviePage, MoviePageIndex
-from wagtailmeili.utils import is_in_meilisearch
 from wagtailmeili.backend import MeilisearchBackend
 
 logger = logging.getLogger(__name__)
@@ -56,7 +54,7 @@ def meilisearch_params():
 @pytest.fixture
 def meilisearch_backend():
     """Real Meilisearch backend for integration tests"""
-    return MeilisearchBackend(params=test_settings.WAGTAILSEARCH_BACKENDS["default"])
+    return MeilisearchBackend(params=test_settings.WAGTAILSEARCH_BACKENDS["meilisearch"])
 
 
 @pytest.fixture

@@ -4,9 +4,8 @@ from wagtail.models import Page
 from wagtail.search import index
 from wagtail.admin.panels import FieldPanel
 from wagtail.fields import RichTextField
-from wagtail.search.index import Indexed
 
-from wagtailmeili.manager import MeilisearchModelManager
+from wagtailmeili.manager import MeilisearchPageManager
 
 
 class MoviePageIndex(Page):
@@ -50,7 +49,7 @@ class MoviePage(Page):
 
 class MoviePageWithManager(MoviePage):
 
-    objects = MeilisearchModelManager()
+    objects = MeilisearchPageManager()
 
     class Meta:
         proxy = True
