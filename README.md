@@ -1,4 +1,5 @@
 # Wagtailmeili
+[![Test](https://github.com/softquantum/wagtailmeili/actions/workflows/test.yml/badge.svg?event=push&branch=main)](https://github.com/softquantum/wagtailmeili/actions?query=workflow%3ATest+event%3Apush+branch%3Amain)
 [![Version](https://img.shields.io/pypi/v/wagtailmeili.svg?style=flat)](https://pypi.python.org/pypi/wagtailmeili/)
 [![codecov](https://codecov.io/gh/softquantum/wagtailmeili/graph/badge.svg?token=QY0HJ9L6N5)](https://codecov.io/gh/softquantum/wagtailmeili)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
