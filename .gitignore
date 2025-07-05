@@ -22,3 +22,5 @@ coverage.xml
 /.tox
 /.tx
 dist/
+uv.lock
+temp_doc/
