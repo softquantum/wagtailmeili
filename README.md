@@ -137,10 +137,69 @@ class MySuperPage(Page):
 {% get_matches_position result %}
 ```
 
+## Index Cleanup
+
+Wagtailmeili automatically handles cleanup of stale documents from your MeiliSearch indexes to ensure search results remain accurate and up-to-date.
+
+### Automatic Cleanup
+
+**Real-time Cleanup**: When items are deleted or unpublished, they are automatically removed from the search index via Django signals.
+
+**Rebuild Cleanup**: When running `python manage.py update_index`, stale documents are automatically detected and removed.
+
+**Smart Detection**: The system automatically handles both regular models and Page models with `live` field detection.
+
+### Manual Cleanup
+
+Use the management command for manual cleanup operations:
+
+```bash
+# Clean all indexes (dry-run mode)
+python manage.py cleanup_search_index --dry-run
+
+# Clean all indexes
+python manage.py cleanup_search_index
+
+# Clean specific model
+python manage.py cleanup_search_index --model wagtailmeili_testapp.MoviePage
+
+# Verbose output
+python manage.py cleanup_search_index --verbosity 2
+```
+
+### Programmatic Cleanup
+
+You can also perform cleanup operations programmatically:
+
+```python
+from wagtail.search.backends import get_search_backend
+
+# Get the MeiliSearch backend
+backend = get_search_backend('meilisearch')
+index = backend.get_index_for_model(MyModel)
+
+# Remove specific items
+index.delete_item(item_id)
+
+# Bulk remove multiple items
+index.bulk_delete_items([id1, id2, id3])
+
+# Clean up stale documents
+live_ids = MyModel.objects.filter(live=True).values_list('pk', flat=True)
+index.cleanup_stale_documents(live_ids)
+```
+
+### Configuration
+
+The cleanup system respects your existing configuration:
+
+- **SKIP_MODELS**: Models in this list won't be cleaned up
+- **SKIP_MODELS_BY_FIELD_VALUE**: Field-based skipping is honored during cleanup
+- **Page Models**: Only live pages (`live=True`) are considered valid for Page models
+
 ## Roadmap before 1.0.0 (unsorted)
 - -[x] ~~Adding tests~~ (v0.3.3)
 - -[x] ~~Cleaning up index if pages are unpublished or models deleted~~ (v0.4.0)
-- -[ ] Refactoring index.py to be with easier testing
 - -[ ] Exploring Meilisearch and bringing more of its features for Wagtail
 - -[ ] Getting a leaner implementation (looking at Autocomplete and rebuilder)
 - -[ ] Giving more love to the Sample project with a frontend
@@ -185,8 +244,34 @@ python manage.py runserver
 python manage.py update_index
 ```
 
+## Development
+
+### Development Setup
+
+This package uses [flit](https://flit.pypa.io/en/latest/) for both local development and publishing.
+
+1. Install flit (if not already available):
+```shell
+# Via pip
+pip install flit
+
+# Via pyenv (if you have a Python version with flit pre-installed)
+# flit may already be available in your pyenv Python installation
+```
+
+2. Install the package locally for development:
+```shell
+# Using pip
+pip install "pip>=21.3"
+pip install -e '.[dev]' -U
+
+# Using flit
+flit install -s
+```
+For more information on installing and using flit, see the [official flit documentation](https://flit.pypa.io/en/latest/install.html).
+
 ## Contributions
-Welcome to all contributions!
+Welcome to all contributions and reviews!
 
 ### Prerequisites
 - Install Meilisearch locally following their [documentation](https://www.meilisearch.com/docs/learn/self_hosted/install_meilisearch_locally)
@@ -221,6 +306,13 @@ or with tox
 ```
 tox
 ```
+
+## Disclaimer
+- ✅ This project is to experiment with my dev experience and improve my skills. 
+- ✅ It is, since v0.3, developed in an **augmented development setup** (JetBrains Pycharm, Claude Code with custom commands and configs)
+- ✅ I commit to have a test suite that makes sense (reviews are welcome)
+- ✅ The project is used in production in real projects: no shortcuts for quality standards, so if you find a bug please report it.
+- ✅ It is an open source project so you can hire me for support ☕️
 
 ## License
 This project is released under the [3-Clause BSD License](LICENSE).
