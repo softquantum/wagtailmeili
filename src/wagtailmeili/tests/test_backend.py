@@ -7,7 +7,7 @@ from wagtailmeili.backend import MeilisearchBackend
 from wagtailmeili.exceptions import MeiliSearchConnectionException
 from wagtailmeili.query_compiler import MeilisearchQueryCompiler, MeilisearchAutocompleteQueryCompiler
 from wagtailmeili.rebuilder import MeilisearchRebuilder
-from wagtailmeili.testapp.models import MoviePage, MoviePageIndex, ReviewPage, NonIndexedModel, NonIndexedPage
+from wagtailmeili.testapp.models import MoviePage, NonIndexedModel, NonIndexedPage
 
 logger = logging.getLogger(__name__)
 

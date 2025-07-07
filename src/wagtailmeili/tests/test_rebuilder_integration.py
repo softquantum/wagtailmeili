@@ -13,11 +13,9 @@ def test_start_with_existing_index(meilisearch_rebuilder):
     index = meilisearch_rebuilder.index
     original_name = "existing_index"
     index.name = original_name
-    # Create the index in meilisearch
     task = index.client.create_index(original_name)
     index.client.wait_for_task(task.task_uid)
 
-    # Start the rebuilder that will check if the index exists and create a new one
     new_index = meilisearch_rebuilder.start()
     assert new_index.name == f"{original_name}_new"
     index.client.delete_index(new_index.name)
@@ -30,12 +28,10 @@ def test_start_with_existing_temporary_index(meilisearch_rebuilder, test_movies)
     main_index_name = "wagtailmeili_testapp_moviepage"
     temp_index_name = f"{main_index_name}_new"
 
-    # normal index
     task = index.client.create_index(main_index_name)
     index.client.wait_for_task(task.task_uid)
     assert is_in_meilisearch(index.client, main_index_name)
 
-    # pre-existing temporary index for swap
     task = index.client.create_index(temp_index_name)
     index.client.wait_for_task(task.task_uid)
     assert is_in_meilisearch(index.client, temp_index_name)
@@ -62,7 +58,6 @@ def test_start_with_existing_temporary_index(meilisearch_rebuilder, test_movies)
     assert new_index.name == f"{main_index_name}_new"
     assert not is_in_meilisearch(index.client, f"{main_index_name}_new")
 
-    # cleanup
     index.client.delete_index(main_index_name)
     index.client.delete_index(temp_index_name)
 
@@ -74,12 +69,10 @@ def test_start_with_existing_temporary_index_deletion_failure(meilisearch_rebuil
     main_index_name = "wagtailmeili_testapp_moviepage"
     temp_index_name = f"{main_index_name}_new"
 
-    # normal index
     task = index.client.create_index(main_index_name)
     index.client.wait_for_task(task.task_uid)
     assert is_in_meilisearch(index.client, main_index_name)
 
-    # pre-existing temporary index for swap
     task = index.client.create_index(temp_index_name)
     index.client.wait_for_task(task.task_uid)
     assert is_in_meilisearch(index.client, temp_index_name)
@@ -102,7 +95,6 @@ def test_start_with_existing_temporary_index_deletion_failure(meilisearch_rebuil
     assert documents2.total == 2
 
     index.name = main_index_name
-    # Mock check_for_task_successful_completion to return False for the deletion
     with patch('wagtailmeili.rebuilder.check_for_task_successful_completion') as mock_check:
         mock_check.return_value = False
 
@@ -111,7 +103,6 @@ def test_start_with_existing_temporary_index_deletion_failure(meilisearch_rebuil
 
         assert f"Failed to delete existing temporary index {temp_index_name}" in str(excinfo.value)
 
-    # cleanup
     index.client.delete_index(main_index_name)
     index.client.delete_index(temp_index_name)
 
@@ -128,7 +119,6 @@ def test_start_without_existing_index(meilisearch_rebuilder):
     new_index = meilisearch_rebuilder.start()
 
     assert new_index.name == "non_existing_index"
-    # We got only a reference so the index should not be created in meilisearch
     assert not is_in_meilisearch(index.client, new_index.name)
 
 
@@ -137,7 +127,6 @@ def test_start_with_error(meilisearch_rebuilder):
     index = meilisearch_rebuilder.index
     index.name = "test_client_error_index"
 
-    # Force an error by making client.index raise an exception
     with patch.object(index.client, 'index', side_effect=Exception('Mocked error')):
         with pytest.raises(MeiliSearchRebuildException) as excinfo:
             meilisearch_rebuilder.start()
@@ -151,18 +140,15 @@ def test_start_with_error_in_getting_index(meilisearch_rebuilder):
     original_name = "test_error_index"
     index.name = original_name
 
-    # Create a test index
     task = index.client.create_index(original_name)
     index.client.wait_for_task(task.task_uid)
 
-    # Mock get_index to raise an exception
     with patch.object(index, 'get_index', side_effect=Exception("Failed to get index")):
         with pytest.raises(MeiliSearchRebuildException) as excinfo:
             meilisearch_rebuilder.start()
 
         assert "Failed to start rebuild process: Failed to get index" in str(excinfo.value)
 
-    # Cleanup
     if is_in_meilisearch(index.client, original_name):
         index.client.delete_index(original_name)
 
@@ -175,7 +161,6 @@ def test_finish_with_swap(meilisearch_rebuilder):
     index._name = main_index_name
     index.name = temp_index_name
 
-    # Create both indexes
     task = index.client.create_index(main_index_name)
     index.client.wait_for_task(task.task_uid)
     task = index.client.create_index(temp_index_name)
@@ -197,7 +182,6 @@ def test_finish_with_error(meilisearch_rebuilder):
     original_name = "existing_index"
     index._name = original_name
 
-    # Create both indexes
     task = index.client.create_index(original_name)
     index.client.wait_for_task(task.task_uid)
     task = index.client.create_index(f"{original_name}_new")
@@ -206,7 +190,6 @@ def test_finish_with_error(meilisearch_rebuilder):
     assert is_in_meilisearch(index.client, original_name)
     assert is_in_meilisearch(index.client, f"{original_name}_new")
 
-    # Mock the client to simulate an error during swap
     with patch.object(index.client, 'swap_indexes', side_effect=Exception('Swap failed')):
         with pytest.raises(MeiliSearchRebuildException, match="Error while finishing the rebuild: Swap failed"):
             meilisearch_rebuilder.finish()
@@ -220,7 +203,6 @@ def test_finish_with_swap_failure(meilisearch_rebuilder):
     index._name = main_index_name
     index.name = temp_index_name
 
-    # Create both indexes
     task = index.client.create_index(main_index_name)
     index.client.wait_for_task(task.task_uid)
     task = index.client.create_index(temp_index_name)
@@ -229,7 +211,6 @@ def test_finish_with_swap_failure(meilisearch_rebuilder):
     assert is_in_meilisearch(index.client, main_index_name)
     assert is_in_meilisearch(index.client, temp_index_name)
 
-    # Mock check_for_task_successful_completion to fail the swap
     with patch('wagtailmeili.rebuilder.check_for_task_successful_completion') as mock_check:
         mock_check.return_value = False  # Swap operation fails
 
@@ -238,7 +219,6 @@ def test_finish_with_swap_failure(meilisearch_rebuilder):
 
         assert "Failed to swap indexes" in str(excinfo.value)
 
-    # Cleanup
     index.client.delete_index(main_index_name)
     index.client.delete_index(temp_index_name)
 
@@ -251,24 +231,20 @@ def test_finish_with_deletion_warning(meilisearch_rebuilder):
     index._name = main_index_name
     index.name = temp_index_name
 
-    # Create both indexes
     task = index.client.create_index(main_index_name)
     index.client.wait_for_task(task.task_uid)
     task = index.client.create_index(temp_index_name)
     index.client.wait_for_task(task.task_uid)
 
-    # Mock check_for_task_successful_completion to succeed for swap but fail for deletion
     with patch('wagtailmeili.rebuilder.check_for_task_successful_completion') as mock_check:
         mock_check.side_effect = [True, False]  # First call (swap) succeeds, second call (delete) fails
 
         with patch('wagtailmeili.rebuilder.logger') as mock_logger:
             task = meilisearch_rebuilder.finish()
-            # Verify that warning was logged
             mock_logger.warning.assert_called_once_with(
                     f"Failed to delete temporary index {temp_index_name}"
             )
 
-    # Cleanup
     index.client.delete_index(main_index_name)
     if is_in_meilisearch(index.client, temp_index_name):
         index.client.delete_index(temp_index_name)
@@ -279,11 +255,9 @@ def test_reset_index_delete_failure(meilisearch_rebuilder):
     index = meilisearch_rebuilder.index
     test_index_name = "test_reset_failure"
 
-    # Create a test index
     task = index.client.create_index(test_index_name)
     index.client.wait_for_task(task.task_uid)
 
-    # Mock check_for_task_successful_completion to return False
     with patch('wagtailmeili.rebuilder.check_for_task_successful_completion') as mock_check:
         mock_check.return_value = False
 
@@ -292,7 +266,6 @@ def test_reset_index_delete_failure(meilisearch_rebuilder):
 
         assert "Failed to delete documents from index" in str(excinfo.value)
 
-    # Cleanup
     index.client.delete_index(test_index_name)
 
 
@@ -300,13 +273,11 @@ def test_delete_all_indexes_failure(meilisearch_rebuilder):
     """Test delete_all_indexes when index deletion fails."""
     index = meilisearch_rebuilder.index
 
-    # Mock get_indexes to return a controlled result
     mock_index = Mock()
     mock_index.uid = "test_index"
     mock_indexes = {'results': [mock_index]}
 
     with patch.object(index.client, 'get_indexes', return_value=mock_indexes):
-        # Mock check_for_task_successful_completion to return False
         with patch('wagtailmeili.rebuilder.check_for_task_successful_completion') as mock_check:
             mock_check.return_value = False
 

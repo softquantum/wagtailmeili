@@ -24,3 +24,5 @@ coverage.xml
 dist/
 uv.lock
 temp_doc/
+CLAUDE.md
+.claude/

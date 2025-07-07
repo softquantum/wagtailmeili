@@ -6,3 +6,8 @@ class WagtailMeiliConfig(AppConfig):
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "wagtailmeili"
+    
+    def ready(self):
+        """Connect signal handlers when the app is ready."""
+        from .signals import connect_signals
+        connect_signals()

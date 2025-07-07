@@ -138,7 +138,8 @@ class MySuperPage(Page):
 ```
 
 ## Roadmap before 1.0.0 (unsorted)
-- -[x] ~~Adding tests~~
+- -[x] ~~Adding tests~~ (v0.3.3)
+- -[x] ~~Cleaning up index if pages are unpublished or models deleted~~ (v0.4.0)
 - -[ ] Refactoring index.py to be with easier testing
 - -[ ] Exploring Meilisearch and bringing more of its features for Wagtail
 - -[ ] Getting a leaner implementation (looking at Autocomplete and rebuilder)

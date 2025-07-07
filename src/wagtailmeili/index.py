@@ -1,5 +1,4 @@
 import logging
-from dataclasses import dataclass
 from typing import Optional, Any
 
 from django.core.serializers import serialize
@@ -51,7 +50,9 @@ class MeilisearchIndex:
         self.model = model
         if model._meta.proxy:
             base_model = model._meta.proxy_for_model  # noqa E501
-            self._name = base_model._meta.app_label.lower() + "_" + base_model.__name__.lower()  # noqa E501
+            self._name = (
+                base_model._meta.app_label.lower() + "_" + base_model.__name__.lower()
+            )  # noqa E501
         else:
             self._name = model._meta.app_label.lower() + "_" + model.__name__.lower()  # noqa E501
         self.name = self._name
@@ -91,9 +92,15 @@ class MeilisearchIndex:
             return None
 
         try:
-            task = self.client.create_index(uid=self.name, options={"primaryKey": self.primary_key})
-            logger.info(f"Creating index '{self.name}' by adding model. Task UID: {task.task_uid}")
-            if not check_for_task_successful_completion(self.client, task_uid=task.task_uid, timeout=300):
+            task = self.client.create_index(
+                uid=self.name, options={"primaryKey": self.primary_key}
+            )
+            logger.info(
+                f"Creating index '{self.name}' by adding model. Task UID: {task.task_uid}"
+            )
+            if not check_for_task_successful_completion(
+                self.client, task_uid=task.task_uid, timeout=300
+            ):
                 logger.error(f"Index creation for '{self.name}' was not successful.")
                 return None
             self.update_index_settings()
@@ -116,6 +123,7 @@ class MeilisearchIndex:
 
         if document:
             try:
+                # Check if index exists and has documents
                 has_documents = self.index.get_documents().total > 0
                 if has_documents:
                     self.index.update_documents(documents=document)
@@ -123,6 +131,7 @@ class MeilisearchIndex:
                     self.index.add_documents(documents=document)
             except MeilisearchApiError as e:
                 if "index_not_found" in str(e):
+                    # Index doesn't exist, create it by adding documents
                     self.index.add_documents(documents=document)
                 else:
                     logger.error(f"Error adding/updating document: {e}")
@@ -135,10 +144,20 @@ class MeilisearchIndex:
         taskinfo = None
 
         if len(documents) > 0:
-            if self.index.get_documents().total > 0:
-                taskinfo = self.index.update_documents(documents=documents)
-            else:
-                taskinfo = self.index.add_documents(documents=documents)
+            try:
+                # Check if index exists and has documents
+                has_documents = self.index.get_documents().total > 0
+                if has_documents:
+                    taskinfo = self.index.update_documents(documents=documents)
+                else:
+                    taskinfo = self.index.add_documents(documents=documents)
+            except MeilisearchApiError as e:
+                if "index_not_found" in str(e):
+                    # Index doesn't exist, create it by adding documents
+                    taskinfo = self.index.add_documents(documents=documents)
+                else:
+                    logger.error(f"Error adding/updating documents: {e}")
+                    raise
 
         return taskinfo
 
@@ -199,7 +218,7 @@ class MeilisearchIndex:
             attribute_value = getattr(item, model_attributes["field"], None)
             if attribute_value == model_attributes["value"]:
                 logger.info(
-                        f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
+                    f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
                 )
                 return True
         return False
@@ -210,7 +229,9 @@ class MeilisearchIndex:
         if getattr(instance, "live", True) is False:
             return None
 
-        document = {"id": instance.pk}  # TODO: "id" may not be the primary key of the model?
+        document = {
+            "id": instance.pk
+        }  # TODO: "id" may not be the primary key of the model?
         for field in fields:
             field_name = field.field_name
             field_value = getattr(instance, field_name, None)
@@ -220,18 +241,78 @@ class MeilisearchIndex:
             elif isinstance(field, wagtail_index.FilterField):
                 document[field_name] = self.serialize_value(field_value)
             elif isinstance(field, wagtail_index.RelatedFields):
-                if isinstance(field_value, (Manager, QuerySet)):  # ManyToManyField and OneToManyField
+                if isinstance(
+                    field_value, (Manager, QuerySet)
+                ):  # ManyToManyField and OneToManyField
                     related_objects = field_value.all()
-                    document[field_name] = [self._process_model_instance(obj, field.fields) for obj in related_objects]
+                    document[field_name] = [
+                        self._process_model_instance(obj, field.fields)
+                        for obj in related_objects
+                    ]
                 elif isinstance(field_value, Model):  # ForeignKey
-                    document[field_name] = self._process_model_instance(field_value, field.fields)
+                    document[field_name] = self._process_model_instance(
+                        field_value, field.fields
+                    )
 
         return document
 
-    def delete_item(self, item) -> TaskInfo:
-        """Delete a document from the index."""
-        taskinfo = self.index.delete_document(item)
-        return taskinfo
+    def delete_item(self, item_or_pk) -> TaskInfo | None:
+        """Enhanced delete with better error handling."""
+        try:
+            # Handle both model instances and primary keys
+            if hasattr(item_or_pk, "pk"):
+                pk = item_or_pk.pk
+            else:
+                pk = item_or_pk
+
+            task = self.index.delete_document(pk)
+            logger.info(f"Deleted document {pk} from index {self.name}")
+            return task
+
+        except MeilisearchApiError as e:
+            if "document_not_found" in str(e):
+                logger.warning(f"Document {pk} not found in index {self.name}")
+                return None
+            else:
+                logger.error(f"Error deleting document {pk}: {e}")
+                raise
+
+    def bulk_delete_items(self, item_pks) -> TaskInfo | None:
+        """Bulk delete multiple items by primary key."""
+        try:
+            if not item_pks:
+                return None
+
+            # Ensure we have a list of primary keys
+            pk_list = [pk.pk if hasattr(pk, "pk") else pk for pk in item_pks]
+
+            task = self.index.delete_documents(pk_list)
+            logger.info(f"Bulk deleted {len(pk_list)} documents from index {self.name}")
+            return task
+
+        except MeilisearchApiError as e:
+            logger.error(f"Error bulk deleting documents: {e}")
+            raise
+
+    def cleanup_stale_documents(self, live_pks) -> None:
+        """Remove documents that shouldn't be in the index."""
+        try:
+            # Get all document IDs currently in index
+            current_docs = self.index.get_documents(fields=["id"])
+            current_index_ids = {doc["id"] for doc in current_docs.results}
+
+            # Convert live_pks to set of strings (MeiliSearch uses string IDs)
+            live_ids = {str(pk) for pk in live_pks}
+
+            # Find stale documents
+            stale_ids = current_index_ids - live_ids
+
+            if stale_ids:
+                self.bulk_delete_items(list(stale_ids))
+                logger.info(f"Cleaned up {len(stale_ids)} stale documents")
+
+        except Exception as e:
+            logger.error(f"Failed to cleanup stale documents: {e}")
 
     def update_index_settings(self) -> TaskInfo:
         """Update index settings based on model's search fields.
@@ -251,14 +332,20 @@ class MeilisearchIndex:
 
             def collect_attributes(field_list, parent_field_name="") -> None:
                 for field in field_list:
-                    field_name = f"{parent_field_name}.{field.field_name}" if parent_field_name else field.field_name
+                    field_name = (
+                        f"{parent_field_name}.{field.field_name}"
+                        if parent_field_name
+                        else field.field_name
+                    )
 
                     if isinstance(field, wagtail_index.SearchField):
                         searchable_attributes.append(field_name)
                     elif isinstance(field, wagtail_index.FilterField):
                         filterable_attributes.append(field_name)
                     elif isinstance(field, wagtail_index.RelatedFields):
-                        collect_attributes(field_list=field.fields, parent_field_name=field_name)
+                        collect_attributes(
+                            field_list=field.fields, parent_field_name=field_name
+                        )
 
             collect_attributes(self.model.get_search_fields())
             if hasattr(self.model, "sortable_attributes"):
@@ -267,7 +354,9 @@ class MeilisearchIndex:
 
             if hasattr(self.model, "ranking_rules"):
                 self.backend.ranking_rules.extend(self.model.ranking_rules)
-                logger.info(f"Ranking rules {self.model.ranking_rules} added for index {self.name}")
+                logger.info(
+                    f"Ranking rules {self.model.ranking_rules} added for index {self.name}"
+                )
                 logger.info(f"Ranking rules are now {self.backend.ranking_rules}.")
 
             index_settings = {
@@ -290,20 +379,22 @@ class MeilisearchIndex:
 
         except MeilisearchApiError as err:
             error_message = f"Error updating settings for index {self.name}"
-            if hasattr(err, 'code'):
+            if hasattr(err, "code"):
                 error_message += f" (Error code: {err.code})"
-            if hasattr(err, 'message'):
+            if hasattr(err, "message"):
                 error_message += f": {err.message}"
             else:
                 error_message += f": {str(err)}"
 
             logger.error(error_message)
 
-            if hasattr(err, '__dict__'):
+            if hasattr(err, "__dict__"):
                 logger.debug(f"Detailed error information: {err.__dict__}")
             return None
 
         except Exception as err:
-            logger.error(f"Unexpected error updating settings for index {self.name}: {str(err)}")
+            logger.error(
+                f"Unexpected error updating settings for index {self.name}: {str(err)}"
+            )
             logger.exception("Stack trace:")
             return None

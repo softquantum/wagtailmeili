@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import Mock
 from meilisearch.errors import MeilisearchApiError
 from requests import HTTPError
-from django.db import models
 from requests import Response
 
 from wagtailmeili.testapp.models import MoviePage
