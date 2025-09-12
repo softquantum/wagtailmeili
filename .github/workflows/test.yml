@@ -47,12 +47,6 @@ jobs:
 
       - name: Test with tox
         run: tox
-        env:
-          MEILISEARCH_URL: http://localhost
-          MEILISEARCH_PORT: 7700
-          MEILISEARCH_MASTER_KEY: correctMasterKey
-          WAGTAILADMIN_BASE_URL: http://example.com
-          TESTS_USE_IN_MEMORY_DATABASE: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

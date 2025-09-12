@@ -161,11 +161,16 @@ class MeilisearchIndex:
 
         return taskinfo
 
-    def serialize_value(self, value) -> str | list | dict:
-        """Make sure `value` is something we can save in the index."""
-        if not value:
+    def serialize_value(self, value) -> str | list | dict | int | float:
+        """Make sure `value` is something we can save in the index.
+
+        TODO: Add performance safeguards for large items and where we have recursive calls.
+        """
+        if not value and value != 0:
             return ""
-        elif isinstance(value, str):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (int, float)):
             return value
         if isinstance(value, list):
             return ", ".join(self.serialize_value(item) for item in value)
@@ -181,7 +186,10 @@ class MeilisearchIndex:
             # is it worth it or should I return an empty value?
             return {"id": value.id, "name": value.name}
         if callable(value):
-            return force_str(value())
+            try:
+                return force_str(value())
+            except Exception:
+                return str(value)
         return str(value)
 
     def prepare_documents(self, model, items) -> list:

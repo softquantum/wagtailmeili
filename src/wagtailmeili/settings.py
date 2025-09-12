@@ -279,9 +279,9 @@ RANKING_RULES = [
   "words",
   "typo",
   "proximity",
+  "sort",
   "attribute",
   "exactness",
-  "sort",
 ]
 
 
