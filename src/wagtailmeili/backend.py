@@ -7,11 +7,12 @@ from wagtail.search.backends.base import BaseSearchBackend, BaseSearchResults
 from wagtail.search.index import class_is_indexed
 
 from .exceptions import MeiliSearchConnectionException
-from .index import MeilisearchIndex
+from .index import MeilisearchIndex, NullIndex
 from .query_compiler import MeilisearchAutocompleteQueryCompiler, MeilisearchQueryCompiler
 from .rebuilder import MeilisearchRebuilder
 from .results import MeilisearchEmptySearchResults, MeilisearchResults
 from .settings import RANKING_RULES, SKIP_MODELS, SKIP_MODELS_BY_FIELD_VALUE, STOP_WORDS
+from .utils import model_is_skipped
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,13 @@ class MeilisearchBackend(BaseSearchBackend):
     def get_rebuilder(self) -> Type[MeilisearchRebuilder]:
         return self.rebuilder_class
 
-    def get_index_for_model(self, model) -> MeilisearchIndex:
+    def get_index_for_model(self, model) -> MeilisearchIndex | NullIndex:
+        if not class_is_indexed(model):
+            return NullIndex()
+
+        if model_is_skipped(model, self.skip_models):
+            return NullIndex()
+
         return self.index_class(backend=self, model=model)
 
     def _get_skipped_models(self, skip_models):  # noqa
@@ -129,7 +136,6 @@ class MeilisearchBackend(BaseSearchBackend):
 
     def _search(self, query_compiler_class, query, model_or_queryset, **kwargs) -> BaseSearchResults:
         """Override the method from BaseSearchBackend."""
-        # Find model/queryset
         if isinstance(model_or_queryset, QuerySet):
             model = model_or_queryset.model
             queryset = model_or_queryset
@@ -137,19 +143,19 @@ class MeilisearchBackend(BaseSearchBackend):
             model = model_or_queryset
             queryset = model_or_queryset.objects.all()
 
-        # Model must be a class that is in the index
         if not class_is_indexed(model):
             return MeilisearchEmptySearchResults()
 
-        # Search
+        index = self.get_index_for_model(model)
+        if isinstance(index, NullIndex):
+            return MeilisearchEmptySearchResults()
+
         opt_params = kwargs.pop("opt_params", {})
         search_query_compiler = query_compiler_class(queryset, query, **kwargs)
 
-        # Set the search params such as page number and hits per page
         if opt_params:
             search_query_compiler.set_opt_params(opt_params)
 
-        # Check the query
         search_query_compiler.check()
 
         return self.results_class(self, search_query_compiler)

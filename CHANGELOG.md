@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
+## [0.5.0] - 2025-11-07
+###  Changed
+- **Removed unnecesary signal integration**
+  - Removed custom `post_delete` signal handler that was causing issues
+  - Kept custom `page_unpublished` signal handler for proper unpublished page cleanup because Wagtail fires `post_save` (not `post_delete`) when pages are unpublished
+- **in MeilisearchBackend**
+  - `get_index_for_model()` now returns `NullIndex` instance for non-indexed models and models in `SKIP_MODELS`
+
+### Fixed
+- **Performance Issue**
+  - MeiliSearch was receiving unnecessary delete requests for non-existent indexes
+  - Root cause: `get_index_for_model()` always returned an index object, even for non-indexed models
+
+## Tests
+- **Tested** with wagtail 7.2 and python 3.14
+- **Improved** testing environment setup
+
 ## [0.4.0] - 2025-01-07
 ### Added
 - **Automatic Index Cleanup**: Comprehensive solution for removing stale documents from MeiliSearch indexes

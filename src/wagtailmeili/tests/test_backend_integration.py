@@ -124,9 +124,11 @@ def test_skip_models(meilisearch_backend, movies_index_page, clean_meilisearch_i
             pytest.skip("MoviePage index was not created - check MeiliSearch configuration")
         raise
 
-    # Test that searching skipped model raises appropriate exception
-    with pytest.raises(MeilisearchApiError, match="index_not_found"):
-        meilisearch_backend.search("Should Not Index", ReviewPage).get()
+    # Test that searching skipped model returns empty results (not an error)
+    review_results = meilisearch_backend.search("Should Not Index", ReviewPage)
+    assert hasattr(review_results, 'get'), "Should return a results object"
+    hits = review_results.get()
+    assert hits == [], "Searching skipped model should return empty results"
 
     # Test that searching returns empty if model skipped by field value
     try:

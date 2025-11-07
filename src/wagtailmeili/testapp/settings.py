@@ -1,13 +1,21 @@
 import os
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 SECRET_KEY = "django-insecure-test-key"
 DEBUG = True
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-if config("TESTS_USE_IN_MEMORY_DATABASE", True, cast=bool) is True:
+if config("DATABASE_URL", default=None):
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=config("DATABASE_URL"),
+            conn_max_age=600,
+        )
+    }
+elif config("TESTS_USE_IN_MEMORY_DATABASE", True, cast=bool) is True:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -98,6 +106,13 @@ WAGTAILSEARCH_BACKENDS = {
 }
 
 WAGTAILADMIN_BASE_URL = config("WAGTAILADMIN_BASE_URL", "http://example.com")
+
+TASKS = {
+    "default": {
+        "BACKEND": "django_tasks.backends.immediate.ImmediateBackend",
+        "ENQUEUE_ON_COMMIT": False,
+    }
+}
 
 STATIC_URL = "/static/"
 MEDIA_URL = "/media/"

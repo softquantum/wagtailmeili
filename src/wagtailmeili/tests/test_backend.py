@@ -2,12 +2,15 @@ import logging
 
 import pytest
 from unittest.mock import MagicMock, patch
+
+from wagtailmeili.index import NullIndex
 from wagtailmeili.results import MeilisearchEmptySearchResults
 from wagtailmeili.backend import MeilisearchBackend
 from wagtailmeili.exceptions import MeiliSearchConnectionException
 from wagtailmeili.query_compiler import MeilisearchQueryCompiler, MeilisearchAutocompleteQueryCompiler
 from wagtailmeili.rebuilder import MeilisearchRebuilder
 from wagtailmeili.testapp.models import MoviePage, NonIndexedModel, NonIndexedPage
+from wagtail.models import ReferenceIndex
 
 logger = logging.getLogger(__name__)
 
@@ -141,3 +144,47 @@ def test_returns_empty_search_results_for_non_indexed_class(meilisearch_backend)
     query = "test query"
     result = meilisearch_backend._search(MeilisearchQueryCompiler, query, queryset)
     assert isinstance(result, MeilisearchEmptySearchResults)
+
+
+@pytest.mark.django_db
+def test_backend_add_method_handles_non_indexed_model(meilisearch_backend):
+    instance = NonIndexedModel.objects.create()
+
+    meilisearch_backend.add(instance)
+
+
+@pytest.mark.django_db
+def test_backend_delete_method_handles_non_indexed_model(meilisearch_backend):
+    instance = NonIndexedModel.objects.create()
+
+    meilisearch_backend.delete(instance)
+
+
+def test_get_index_for_model_returns_nullindex_for_non_indexed_model(meilisearch_backend):
+    index = meilisearch_backend.get_index_for_model(NonIndexedModel)
+    assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for non-indexed models"
+
+
+def test_get_index_for_model_returns_nullindex_for_non_indexed_page(meilisearch_backend):
+    index = meilisearch_backend.get_index_for_model(NonIndexedPage)
+    assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for non-indexed pages"
+
+
+def test_get_index_for_model_returns_nullindex_for_wagtail_internal_model(meilisearch_backend):
+    index = meilisearch_backend.get_index_for_model(ReferenceIndex)
+    assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for Wagtail internal models"
+
+
+def test_get_index_for_model_returns_index_for_indexed_model(meilisearch_backend):
+    index = meilisearch_backend.get_index_for_model(MoviePage)
+    assert index is not None, "get_index_for_model should return index for indexed models"
+    assert not isinstance(index, NullIndex), "get_index_for_model should return MeilisearchIndex, not NullIndex"
+    assert index.model == MoviePage
+
+
+def test_get_index_for_model_returns_nullindex_for_skipped_model(meilisearch_params):
+    meilisearch_params["SKIP_MODELS"] = ["wagtailmeili_testapp.MoviePage"]
+    backend = MeilisearchBackend(meilisearch_params)
+
+    index = backend.get_index_for_model(MoviePage)
+    assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for models in SKIP_MODELS"

@@ -406,3 +406,29 @@ class MeilisearchIndex:
             )
             logger.exception("Stack trace:")
             return None
+
+
+class NullIndex:
+    """
+    Index class that provides do-nothing implementations of the indexing operations required by
+    BaseSearchBackend. Use this for search backends that do not maintain an index, such as the
+    database backend.
+
+    Moved in the package due to changes from Wagtail 7.2
+
+    """
+
+    def add_model(self, model):
+        pass
+
+    def refresh(self):
+        pass
+
+    def add_item(self, item):
+        pass
+
+    def add_items(self, model, items):
+        pass
+
+    def delete_item(self, item):
+        pass
