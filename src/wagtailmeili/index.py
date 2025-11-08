@@ -211,8 +211,23 @@ class MeilisearchIndex:
         return documents
 
     def _should_skip(self, item, model):
-        """Check if an item should be skipped based on the model and skip_models_by_field_value."""
+        """Determine if an item should be excluded from indexing.
 
+        This method performs instance-level validation checks to filter out items
+        that should not be indexed. Model-level filtering (via SKIP_MODELS) is
+        handled earlier in backend.get_index_for_model().
+
+        Checks are ordered from most common to least common for performance:
+        1. Page live status check (frequently triggered)
+        2. Custom field-based skip rules (less common, configured per model)
+
+        Args:
+            item: The model instance to check
+            model: The model class
+
+        Returns:
+            bool: True if the item should be skipped, False if it should be indexed
+        """
         model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
         model_attributes = self.backend.skipped_models_by_field_value.get(model_key)
 
@@ -221,16 +236,45 @@ class MeilisearchIndex:
             return True
 
         if model_attributes:
-            attribute_value = getattr(item, model_attributes["field"], None)
-            if attribute_value == model_attributes["value"]:
+            field_name = model_attributes.get("field")
+            expected_value = model_attributes.get("value")
+
+            if field_name is None:
+                logger.warning(
+                    f"Invalid skip configuration for {model_key}: missing 'field' key. "
+                    f"Expected format: {{'field': 'field_name', 'value': expected_value}}"
+                )
+                return False
+
+            if expected_value is None:
+                logger.warning(
+                    f"Invalid skip configuration for {model_key}: missing 'value' key. "
+                    f"Expected format: {{'field': 'field_name', 'value': expected_value}}"
+                )
+                return False
+
+            attribute_value = getattr(item, field_name, None)
+            if attribute_value == expected_value:
                 logger.debug(
-                    f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
+                    f"Skipping {model.__name__} {item.id} because {field_name} is {expected_value}"
                 )
                 return True
         return False
 
     def _process_model_instance(self, instance, fields) -> dict | None:
-        """Recursively process a model instance for indexing."""
+        """Transform a model instance into an indexable document dictionary.
+
+        This method assumes the instance has already passed validation in _should_skip().
+        It recursively processes the model's search fields, including nested relationships,
+        to build a flat or nested document structure suitable for MeiliSearch indexing.
+
+        Args:
+            instance: The model instance to process
+            fields: List of search field definitions from model.get_search_fields()
+
+        Returns:
+            dict: Document dictionary ready for indexing, or None if processing fails
+        """
         document = {
             "id": instance.pk
         }  # TODO: "id" may not be the primary key of the model?
