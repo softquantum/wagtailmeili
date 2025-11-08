@@ -201,7 +201,7 @@ class MeilisearchIndex:
             items = [items]
 
         for item in items:
-            if self._should_skip(item, model, self.backend.skip_models_by_field_value):
+            if self._should_skip(item, model):
                 continue
 
             document = self._process_model_instance(instance=item, fields=search_fields)
@@ -210,11 +210,11 @@ class MeilisearchIndex:
 
         return documents
 
-    def _should_skip(self, item, model, skipped_models_by_field_value):
+    def _should_skip(self, item, model):
         """Check if an item should be skipped based on the model and skip_models_by_field_value."""
 
         model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
-        model_attributes = skipped_models_by_field_value.get(model_key)
+        model_attributes = self.backend.skipped_models_by_field_value.get(model_key)
 
         if isinstance(item, Page) and not item.live:
             logger.debug(f"Skipping {model.__name__} {item.id} because it is not live")

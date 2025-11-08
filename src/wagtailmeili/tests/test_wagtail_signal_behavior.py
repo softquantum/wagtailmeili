@@ -103,8 +103,7 @@ def test_meilisearch_index_prepare_documents_filters_unpublished(meilisearch_ind
     documents = meilisearch_index.prepare_documents(MoviePage, [movie])
 
     assert len(documents) == 0, (
-        "MeilisearchIndex.prepare_documents should return empty list for unpublished pages. "
-        "This is implemented in _process_model_instance() lines 237-238"
+        "MeilisearchIndex.prepare_documents should return empty list for unpublished pages."
     )
 
 
