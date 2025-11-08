@@ -213,11 +213,9 @@ class MeilisearchIndex:
     def _should_skip(self, item, model, skipped_models_by_field_value):
         """Check if an item should be skipped based on the model and skip_models_by_field_value."""
 
-        if model_is_skipped(model, self.backend.skip_models):
-            return True
-
         model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
         model_attributes = skipped_models_by_field_value.get(model_key)
+
         if isinstance(item, Page) and not item.live:
             logger.debug(f"Skipping {model.__name__} {item.id} because it is not live")
             return True
