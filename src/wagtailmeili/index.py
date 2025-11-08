@@ -219,13 +219,13 @@ class MeilisearchIndex:
         model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
         model_attributes = skipped_models_by_field_value.get(model_key)
         if isinstance(item, Page) and not item.live:
-            logger.info(f"Skipping {model.__name__} {item.id} because it is not live")
+            logger.debug(f"Skipping {model.__name__} {item.id} because it is not live")
             return True
 
         if model_attributes:
             attribute_value = getattr(item, model_attributes["field"], None)
             if attribute_value == model_attributes["value"]:
-                logger.info(
+                logger.debug(
                     f"Skipping {model.__name__} {item.id} because {model_attributes['field']} is {model_attributes['value']}"
                 )
                 return True
@@ -233,10 +233,6 @@ class MeilisearchIndex:
 
     def _process_model_instance(self, instance, fields) -> dict | None:
         """Recursively process a model instance for indexing."""
-        # exclude draft or unpublished pages for the instances with a live attribute
-        if getattr(instance, "live", True) is False:
-            return None
-
         document = {
             "id": instance.pk
         }  # TODO: "id" may not be the primary key of the model?
@@ -274,7 +270,7 @@ class MeilisearchIndex:
                 pk = item_or_pk
 
             task = self.index.delete_document(pk)
-            logger.info(f"Deleted document {pk} from index {self.name}")
+            logger.debug(f"Deleted document {pk} from index {self.name}")
             return task
 
         except MeilisearchApiError as e:
