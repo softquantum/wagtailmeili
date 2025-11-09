@@ -12,7 +12,7 @@ from wagtail.models import Collection, Page
 from wagtail.search import index as wagtail_index
 from wagtail.search.index import class_is_indexed
 
-from wagtailmeili.utils import check_for_task_successful_completion, model_is_skipped
+from wagtailmeili.utils import check_for_task_successful_completion, model_is_skipped, is_in_meilisearch
 
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,10 @@ class MeilisearchIndex:
 
         if self._is_not_indexable(model):
             return None
+
+        if is_in_meilisearch(self.client, self.name):
+            logger.debug(f"Index '{self.name}' already exists, skipping creation")
+            return self.client.index(self.name)
 
         try:
             task = self.client.create_index(
