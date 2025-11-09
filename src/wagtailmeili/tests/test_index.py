@@ -107,7 +107,11 @@ def test_add_model_error_handling(meilisearch_backend, monkeypatch):
         response._content = b'{"message": "Test error", "code": "index_creation_failed"}'
         raise MeilisearchApiError("Test error message", response)
 
+    def mock_is_in_meilisearch(*args, **kwargs):
+        return False
+
     monkeypatch.setattr(meilisearch_backend.client, "create_index", mock_create_index)
+    monkeypatch.setattr("wagtailmeili.index.is_in_meilisearch", mock_is_in_meilisearch)
     index = MeilisearchIndex(meilisearch_backend, MoviePage)
 
     result = index.add_model(MoviePage)

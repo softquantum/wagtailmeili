@@ -14,6 +14,10 @@ jobs:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+
     services:
       meilisearch:
         image: getmeili/meilisearch:v1.5
