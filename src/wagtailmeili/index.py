@@ -60,6 +60,38 @@ class MeilisearchIndex:
         self.documents = []
         self.index = self.get_index(self.name)
 
+    def get_key(self):
+        """
+        Returns a hashable value that uniquely identifies this index within the search backend.
+        Required by modelsearch BaseIndex interface (Wagtail 7.2+).
+        """
+        return self.name
+
+    def refresh(self):
+        """
+        Perform housekeeping so recently-updated data is visible to searches.
+        For MeiliSearch, this is a no-op since MeiliSearch handles updates
+        automatically with near real-time indexing.
+        Required by modelsearch BaseIndex interface (Wagtail 7.2+).
+        """
+        pass
+
+    def reset(self):
+        """
+        Reset the index to initial state by deleting all documents.
+        Required by modelsearch BaseIndex interface (Wagtail 7.2+).
+        """
+        try:
+            task = self.index.delete_all_documents()
+            if not check_for_task_successful_completion(
+                self.client, task_uid=task.task_uid, timeout=200
+            ):
+                logger.error(f"Reset operation for index '{self.name}' was not successful.")
+            else:
+                logger.info(f"Reset index '{self.name}' - deleted all documents")
+        except MeilisearchApiError as e:
+            logger.error(f"Error resetting index {self.name}: {e}")
+
     def _is_not_indexable(self, model) -> IndexOperationStatus | None:
         """Validate if the model should be indexed."""
         if not class_is_indexed(model):
@@ -460,10 +492,20 @@ class NullIndex:
 
     """
 
+    def get_key(self):
+        """
+        Returns a hashable value that uniquely identifies this index within the search backend.
+        Required by modelsearch BaseIndex interface (Wagtail 7.2+).
+        """
+        return "default"
+
     def add_model(self, model):
         pass
 
     def refresh(self):
+        pass
+
+    def reset(self):
         pass
 
     def add_item(self, item):
