@@ -15,9 +15,8 @@ classifiers = [
     "Environment :: Web Environment",
     "Framework :: Django",
     "Framework :: Wagtail",
-    "Framework :: Wagtail :: 5",
-    "Framework :: Wagtail :: 6",
     "Framework :: Wagtail :: 7",
+    "Framework :: Wagtail :: 8",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
     "Operating System :: OS Independent",
@@ -31,7 +30,7 @@ classifiers = [
 dynamic = ["version"]
 requires-python = ">=3.11"
 dependencies = [
-  "wagtail>=5.2",
+  "wagtail>=7.0",
   "meilisearch>=0.29",
   "python-decouple>=3.8",
 ]

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
+## [0.6.0] - 2026-10-04
+### Added
+- **Wagtail 8.0 support**, tested with Django 5.2, 6.0 and 6.1
+- **Custom base page models:** unpublished pages are skipped for page types built on a swapped base page model (`WAGTAIL_PAGE_MODEL`, Wagtail 8.0+)
+
+### Removed
+- Support for Wagtail < 7.0 and Django < 5.2
+
+### Fixed
+- Test configuration no longer references `RemovedInDjango60Warning`, which broke pytest on Django 6.x
+
+## Tests
+- **Tested** with Wagtail 7.0, 7.4 and 8.0, Python 3.11 to 3.14 and Meilisearch 1.54
+
+## [0.5.2] - 2025-11-14
+### Added
+- **Wagtail 7.2 support:** `get_key()`, `refresh()` and `reset()` on `MeilisearchIndex` and `NullIndex` (modelsearch `BaseIndex` interface)
+
 ## [0.5.1] - 2025-11-08
 ### Fixed
 - **Proxy models:** Avoid duplicate index creation attempts for proxy models
