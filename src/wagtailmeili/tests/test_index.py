@@ -1,7 +1,9 @@
+from unittest.mock import Mock
+
 from django.db import models
 from requests import Response
 from wagtail.search import index as wagtail_index
-from wagtail.models import Page
+from wagtail.models import AbstractPage, Page
 from wagtailmeili.index import MeilisearchIndex, IndexOperationStatus
 from wagtailmeili.testapp.models import MoviePage, NonIndexedModel
 from meilisearch.errors import MeilisearchApiError
@@ -15,6 +17,17 @@ def test_skip_unpublished_pages(meilisearch_backend, load_movies_data):
 
     documents = meili_index.prepare_documents(MoviePage, [movie])
     assert len(documents) == 0
+
+
+def test_skip_unpublished_pages_with_custom_base_page_model(meilisearch_backend):
+    """Test that unpublished pages inheriting from a custom base page model are skipped."""
+    meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
+    custom_page = Mock(spec=AbstractPage)
+    custom_page.id = 1
+    custom_page.live = False
+
+    assert not isinstance(custom_page, Page)
+    assert meili_index._should_skip(custom_page, MoviePage) is True
 
 
 def test_serialize_value(meilisearch_backend):

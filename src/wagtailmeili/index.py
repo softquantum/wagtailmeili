@@ -8,7 +8,7 @@ from enum import StrEnum, auto
 from meilisearch import Client
 from meilisearch.task import TaskInfo
 from meilisearch.errors import MeilisearchApiError
-from wagtail.models import Collection, Page
+from wagtail.models import AbstractPage, Collection
 from wagtail.search import index as wagtail_index
 from wagtail.search.index import class_is_indexed
 
@@ -267,7 +267,7 @@ class MeilisearchIndex:
         model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
         model_attributes = self.backend.skip_models_by_field_value.get(model_key)
 
-        if isinstance(item, Page) and not item.live:
+        if isinstance(item, AbstractPage) and not item.live:
             logger.debug(f"Skipping {model.__name__} {item.id} because it is not live")
             return True
 
