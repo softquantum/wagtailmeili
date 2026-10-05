@@ -13,10 +13,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Support for Wagtail < 7.0 and Django < 5.2
 
 ### Fixed
+- **Stale document cleanup:** `cleanup_search_index`, `MeilisearchIndex.cleanup_stale_documents()` and `MeilisearchRebuilder.rebuild_index_for_model()` deleted nothing because of an invalid call to the Meilisearch client. They now read all document IDs (paginated) and remove the stale ones
+- **`update_index` with `SKIP_MODELS`:** the command no longer crashes on models listed in `SKIP_MODELS`
+- `cleanup_search_index` skips models without an index instead of reporting an error for them
 - Test configuration no longer references `RemovedInDjango60Warning`, which broke pytest on Django 6.x
 
 ## Tests
 - **Tested** with Wagtail 7.0, 7.4 and 8.0, Python 3.11 to 3.14 and Meilisearch 1.54
+- **Added** integration tests against a real Meilisearch instance for stale document cleanup, `update_index`, unpublishing, and the absence of requests for models without an index (#2)
+- **Replaced** mock-based cleanup tests that did not match the Meilisearch client
+- **Added** a tox environment pinned to the minimum supported Meilisearch client (0.29.0)
 
 ## [0.5.2] - 2025-11-14
 ### Added
