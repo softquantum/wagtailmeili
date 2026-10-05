@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Stale document cleanup:** `cleanup_search_index`, `MeilisearchIndex.cleanup_stale_documents()` and `MeilisearchRebuilder.rebuild_index_for_model()` deleted nothing because of an invalid call to the Meilisearch client. They now read all document IDs (paginated) and remove the stale ones
 - **`update_index` with `SKIP_MODELS`:** the command no longer crashes on models listed in `SKIP_MODELS`
 - `cleanup_search_index` skips models without an index instead of reporting an error for them
+- **Proxy models:** a `SKIP_MODELS_BY_FIELD_VALUE` rule set on a model now also applies to items indexed through its proxy models, and listing a model in `SKIP_MODELS` also skips its proxy models. Previously `update_index` indexed the skipped items through the proxy, which shares the same index
 - Test configuration no longer references `RemovedInDjango60Warning`, which broke pytest on Django 6.x
 
 ## Tests
