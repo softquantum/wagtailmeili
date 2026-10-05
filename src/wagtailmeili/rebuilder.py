@@ -1,7 +1,7 @@
 import logging
 
 from .exceptions import MeiliSearchRebuildException
-from .index import MeilisearchIndex
+from .index import MeilisearchIndex, NullIndex
 from .utils import check_for_task_successful_completion, is_in_meilisearch
 from meilisearch.task import TaskInfo
 
@@ -22,7 +22,7 @@ class MeilisearchRebuilder:
         self.index: MeilisearchIndex = index
         self.backend = getattr(index, "backend", None)
 
-    def start(self) -> MeilisearchIndex:
+    def start(self) -> MeilisearchIndex | NullIndex:
         """Start the rebuild process.
 
         Returns:
@@ -31,6 +31,9 @@ class MeilisearchRebuilder:
         Raises:
             MeiliSearchRebuildException: If there's an error during the start process
         """
+        if isinstance(self.index, NullIndex):
+            return self.index
+
         try:
             if is_in_meilisearch(self.index.client, self.index.name):
                 new_index_name = f"{self.index.name}_new"
@@ -64,7 +67,7 @@ class MeilisearchRebuilder:
 
         return self.index
 
-    def finish(self) -> TaskInfo:
+    def finish(self) -> TaskInfo | None:
         """Finish the rebuild process by swapping indexes if needed.
 
         Returns:
@@ -75,6 +78,9 @@ class MeilisearchRebuilder:
             MeiliSearchRebuildException: If there's an error during the finish process
 
         """
+        if isinstance(self.index, NullIndex):
+            return None
+
         logger.info("Rebuilder: Finishing the rebuild.")
         temp_index_name = self.index._name + "_new"  # noqa E501
         task = None

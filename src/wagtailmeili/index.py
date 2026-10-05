@@ -505,12 +505,14 @@ class NullIndex:
 
     """
 
+    name = "default"
+
     def get_key(self):
         """
         Returns a hashable value that uniquely identifies this index within the search backend.
         Required by modelsearch BaseIndex interface (Wagtail 7.2+).
         """
-        return "default"
+        return self.name
 
     def add_model(self, model):
         pass
