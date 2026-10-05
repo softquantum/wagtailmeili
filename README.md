@@ -7,21 +7,19 @@
 
 A search backend for Wagtail using [MeiliSearch](https://github.com/meilisearch/MeiliSearch).
 
-> [!CAUTION]
-> This package is still in development and until version 1.0.0, I will not maintain a DeprecationWarning pattern.
-> I built the integration with meilisearch about 2 years ago for a project and decided to make it a public package to improve it and integrate more features.
-
 > [!TIP]  
 > If you need support or require help with a Wagtail project, you can hire me 😊
 
 ## Introduction
 en - https://softquantum.com/resources/wagtailmeili-integrating-a-blazing-fast-search-engine-with-wagtail
-
 fr - https://softquantum.com/fr/ressources/wagtailmeili-integrer-un-moteur-de-recherche-rapide-avec-wagtail/
 
 ## Requirements
 Wagtailmeili requires the following:
-- Python >= 3.11
+### from version 0.6.x
+- **Wagtail >= 7.0**
+
+### before version 0.6.x
 - Wagtail >= 5.2
 
 ## Installation
@@ -91,6 +89,9 @@ WAGTAILSEARCH_BACKENDS = {
     }
 }
 ```
+* Proxy models: a proxy model is indexed in the same index as its concrete model, so both settings also apply to proxies.
+  * A model listed in `SKIP_MODELS` is skipped together with its proxy models. Listing only a proxy model leaves the concrete model indexed.
+  * A `SKIP_MODELS_BY_FIELD_VALUE` rule set on a model also applies to instances indexed through its proxy models. A rule set on the proxy model itself takes precedence for that proxy.
 
 ### Model fields
 
