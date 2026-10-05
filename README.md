@@ -17,6 +17,7 @@ fr - https://softquantum.com/fr/ressources/wagtailmeili-integrer-un-moteur-de-re
 ## Requirements
 Wagtailmeili requires the following:
 ### from version 0.6.x
+- **Python >= 3.12**
 - **Wagtail >= 7.0**
 
 ### before version 0.6.x
