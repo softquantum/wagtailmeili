@@ -1,11 +1,12 @@
 from unittest.mock import Mock
 
+import pytest
 from django.db import models
 from requests import Response
 from wagtail.search import index as wagtail_index
 from wagtail.models import AbstractPage, Page
 from wagtailmeili.index import MeilisearchIndex, IndexOperationStatus
-from wagtailmeili.testapp.models import MoviePage, NonIndexedModel
+from wagtailmeili.testapp.models import MoviePage, MoviePageWithManager, NonIndexedModel
 from meilisearch.errors import MeilisearchApiError
 
 
@@ -28,6 +29,32 @@ def test_skip_unpublished_pages_with_custom_base_page_model(meilisearch_backend)
 
     assert not isinstance(custom_page, Page)
     assert meili_index._should_skip(custom_page, MoviePage) is True
+
+
+@pytest.mark.django_db
+def test_skip_by_field_value_of_concrete_model_applies_to_its_proxy(meilisearch_backend, movies_index_page):
+    """Test that a field value rule set on a model also skips items indexed through its proxy."""
+    jedi = movies_index_page.add_child(instance=MoviePage(title="Return of the Jedi", slug="return-of-the-jedi"))
+    other = movies_index_page.add_child(instance=MoviePage(title="Star Wars", slug="star-wars"))
+    index = meilisearch_backend.get_index_for_model(MoviePageWithManager)
+
+    documents = index.prepare_documents(MoviePageWithManager, [jedi, other])
+
+    assert [document["id"] for document in documents] == [other.pk]
+
+
+@pytest.mark.django_db
+def test_skip_by_field_value_of_proxy_does_not_apply_to_concrete_model(meilisearch_backend, movies_index_page):
+    """Test that a field value rule set on a proxy only skips items indexed through that proxy."""
+    movie = movies_index_page.add_child(instance=MoviePage(title="Star Wars", slug="star-wars"))
+    meilisearch_backend.skip_models_by_field_value = {
+        "wagtailmeili_testapp.moviepagewithmanager": {"field": "title", "value": "Star Wars"}
+    }
+    proxy_index = meilisearch_backend.get_index_for_model(MoviePageWithManager)
+    concrete_index = meilisearch_backend.get_index_for_model(MoviePage)
+
+    assert proxy_index.prepare_documents(MoviePageWithManager, [movie]) == []
+    assert [document["id"] for document in concrete_index.prepare_documents(MoviePage, [movie])] == [movie.pk]
 
 
 def test_serialize_value(meilisearch_backend):

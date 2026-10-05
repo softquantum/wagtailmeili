@@ -248,6 +248,18 @@ class MeilisearchIndex:
 
         return documents
 
+    def _get_skip_rule(self, model):
+        """Return the skip_models_by_field_value key and rule for the model.
+
+        A rule set on a proxy model takes precedence over the rule of its concrete model.
+        """
+        for candidate in (model, model._meta.concrete_model):  # noqa E501
+            model_key = f"{candidate._meta.app_label}.{candidate.__name__}".lower()  # noqa E501
+            model_attributes = self.backend.skip_models_by_field_value.get(model_key)
+            if model_attributes:
+                return model_key, model_attributes
+        return model_key, None
+
     def _should_skip(self, item, model):
         """Determine if an item should be excluded from indexing.
 
@@ -266,8 +278,7 @@ class MeilisearchIndex:
         Returns:
             bool: True if the item should be skipped, False if it should be indexed
         """
-        model_key = f"{model._meta.app_label}.{model.__name__}".lower()  # noqa E501
-        model_attributes = self.backend.skip_models_by_field_value.get(model_key)
+        model_key, model_attributes = self._get_skip_rule(model)
 
         if isinstance(item, AbstractPage) and not item.live:
             logger.debug(f"Skipping {model.__name__} {item.id} because it is not live")

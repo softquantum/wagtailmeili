@@ -9,9 +9,10 @@ REVIEW_INDEX = "wagtailmeili_testapp_reviewpage"
 
 @pytest.fixture
 def pages(movies_index_page, clean_meilisearch_index):
-    """Create a live movie, a draft movie and a page of a model listed in SKIP_MODELS."""
+    """Create a live movie, a draft, a movie skipped by field value and a page of a skipped model."""
     live = movies_index_page.add_child(instance=MoviePage(title="Star Wars", slug="star-wars"))
     movies_index_page.add_child(instance=MoviePage(title="Draft movie", slug="draft-movie", live=False))
+    movies_index_page.add_child(instance=MoviePage(title="Return of the Jedi", slug="return-of-the-jedi"))
     movies_index_page.add_child(instance=ReviewPage(title="A review", slug="a-review"))
     return live
 
@@ -21,7 +22,7 @@ def index_uids(backend):
 
 
 @pytest.mark.django_db
-def test_update_index_with_skip_models_indexes_only_live_pages_of_unskipped_models(
+def test_update_index_indexes_only_live_unskipped_pages(
     meilisearch_backend, pages, wait_for_meilisearch
 ):
     call_command("update_index", backend_name="meilisearch", verbosity=0)
