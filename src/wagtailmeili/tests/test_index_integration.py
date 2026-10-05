@@ -74,19 +74,20 @@ def test_add_items(meilisearch_backend, load_movies_data, clean_meilisearch_inde
 
 
 @pytest.mark.django_db
-def test_delete_item(meilisearch_backend, load_movies_data, clean_meilisearch_index):
+def test_delete_item(meilisearch_backend, load_movies_data, clean_meilisearch_index, wait_for_meilisearch):
     """Test deleting an item from the index."""
     meili_index = MeilisearchIndex(meilisearch_backend, MoviePage)
     meili_index.add_model(MoviePage)
 
     movie = MoviePage.objects.first()
     meili_index.add_item(movie)
+    wait_for_meilisearch()
+    assert str(movie.id) in meili_index.get_document_ids()
 
     task_info = meili_index.delete_item(movie.id)
     meilisearch_backend.client.wait_for_task(task_info.task_uid)
 
-    docs = meili_index.index.get_documents()
-    assert not any(doc['id'] == movie.id for doc in docs.results)
+    assert str(movie.id) not in meili_index.get_document_ids()
 
 
 @pytest.mark.django_db

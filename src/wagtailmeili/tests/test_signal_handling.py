@@ -107,17 +107,16 @@ def test_page_unpublished_signal_skips_non_indexed_models(mock_get_backend, test
 
 
 @pytest.mark.django_db
-def test_signal_handlers_are_automatically_connected():
-    from wagtailmeili.signals import connect_signals
-    from wagtailmeili.apps import WagtailMeiliConfig
+def test_unpublishing_a_page_removes_it_from_the_index(
+    meilisearch_backend, test_movie, clean_meilisearch_index, wait_for_meilisearch
+):
+    index = meilisearch_backend.get_index_for_model(MoviePage)
+    index.add_model(MoviePage)
+    index.add_item(test_movie)
+    wait_for_meilisearch()
+    assert index.get_document_ids() == {str(test_movie.pk)}
 
-    assert callable(connect_signals)
+    test_movie.unpublish()
+    wait_for_meilisearch()
 
-    app_config = WagtailMeiliConfig
-    assert hasattr(app_config, 'ready')
-    assert callable(app_config.ready)
-
-    try:
-        connect_signals()
-    except Exception as e:
-        pytest.fail(f"connect_signals() raised an exception: {e}")
+    assert index.get_document_ids() == set()

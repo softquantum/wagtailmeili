@@ -94,14 +94,6 @@ def test_movies():
     movie2.slug = "john-doe"
     movie2.live = True
 
-    # Mock the get_search_fields method on MoviePage
-    MoviePage.get_search_fields = Mock(return_value=[
-        Mock(
-            field_name='title',
-            **{'__class__.__name__': 'SearchField'}  # This makes isinstance(field, SearchField) work
-        )
-    ])
-
     return [movie1, movie2]
 
 

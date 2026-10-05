@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 from wagtail.search import index as wagtail_search_index
 import wagtail
 
@@ -36,7 +36,7 @@ def test_wagtail_insert_or_update_object_with_unpublished_page(movies_index_page
 
 
 @pytest.mark.django_db
-def test_wagtail_get_indexed_objects_filters_unpublished_pages(movies_index_page):
+def test_wagtail_get_indexed_objects_includes_unpublished_pages(movies_index_page):
     movie1 = MoviePage(
         title="Published Movie",
         slug="published-movie",
@@ -55,17 +55,12 @@ def test_wagtail_get_indexed_objects_filters_unpublished_pages(movies_index_page
     )
     movies_index_page.add_child(instance=movie2)
 
-    indexed_objects = MoviePage.get_indexed_objects()
+    indexed_pks = set(MoviePage.get_indexed_objects().values_list('pk', flat=True))
 
-    indexed_pks = list(indexed_objects.values_list('pk', flat=True))
-
-    assert movie1.pk in indexed_pks, "Published page should be in indexed objects"
-
-    if movie2.pk not in indexed_pks:
-        print("SUCCESS: Wagtail filters unpublished pages at get_indexed_objects() level")
-    else:
-        print("INFO: Wagtail does NOT filter by live status in get_indexed_objects()")
-        print("This means backends must handle filtering unpublished pages")
+    assert indexed_pks == {movie1.pk, movie2.pk}, (
+        "Wagtail does NOT filter by live status in get_indexed_objects(), "
+        "so the backend must filter unpublished pages itself"
+    )
 
 
 @pytest.mark.django_db
@@ -131,24 +126,3 @@ def test_page_unpublish_workflow(movies_index_page, meilisearch_backend):
         "Should NOT create document for unpublished page - "
         "this proves _process_model_instance filters correctly"
     )
-
-
-@pytest.mark.django_db
-def test_conclusion_unpublish_needs_explicit_delete():
-    print("\n" + "="*80)
-    print("CONCLUSION: Unpublish handling analysis")
-    print("="*80)
-    print()
-    print("When a page is unpublished:")
-    print("1. Wagtail fires post_save signal (NOT post_delete)")
-    print("2. get_indexed_instance() returns the instance (doesn't filter by live)")
-    print("3. Backend's add() method is called")
-    print("4. add_item() -> prepare_documents() returns empty list for live=False")
-    print("5. No document is added to index")
-    print()
-    print("PROBLEM: If page was previously indexed when live=True,")
-    print("         it remains in index after unpublish!")
-    print()
-    print("SOLUTION NEEDED: When prepare_documents() returns empty,")
-    print("                 we should explicitly delete from index")
-    print("="*80)
