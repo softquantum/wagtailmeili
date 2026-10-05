@@ -9,7 +9,7 @@ from wagtailmeili.backend import MeilisearchBackend
 from wagtailmeili.exceptions import MeiliSearchConnectionException
 from wagtailmeili.query_compiler import MeilisearchQueryCompiler, MeilisearchAutocompleteQueryCompiler
 from wagtailmeili.rebuilder import MeilisearchRebuilder
-from wagtailmeili.testapp.models import MoviePage, NonIndexedModel, NonIndexedPage
+from wagtailmeili.testapp.models import MoviePage, MoviePageWithManager, NonIndexedModel, NonIndexedPage
 from wagtail.models import ReferenceIndex
 
 logger = logging.getLogger(__name__)
@@ -188,3 +188,11 @@ def test_get_index_for_model_returns_nullindex_for_skipped_model(meilisearch_par
 
     index = backend.get_index_for_model(MoviePage)
     assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for models in SKIP_MODELS"
+
+
+def test_get_index_for_model_returns_nullindex_for_proxy_of_skipped_model(meilisearch_params):
+    meilisearch_params["SKIP_MODELS"] = ["wagtailmeili_testapp.MoviePage"]
+    backend = MeilisearchBackend(meilisearch_params)
+
+    index = backend.get_index_for_model(MoviePageWithManager)
+    assert isinstance(index, NullIndex), "get_index_for_model should return NullIndex for proxies of models in SKIP_MODELS"

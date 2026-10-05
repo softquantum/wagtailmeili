@@ -27,8 +27,11 @@ def model_is_skipped(model: Type[Model], skip_models: list[str]) -> bool:
     if not (isinstance(model, type) and issubclass(model, Model)):
         raise TypeError("Expected a Django/Wagtail Model class")
 
-    model_identifier = f"{model._meta.app_label}.{model.__name__}".lower()
-    return model_identifier in [item.lower() for item in skip_models]
+    skipped = [item.lower() for item in skip_models]
+    return any(
+        f"{candidate._meta.app_label}.{candidate.__name__}".lower() in skipped
+        for candidate in (model, model._meta.concrete_model)
+    )
 
 
 def check_for_task_successful_completion(client, task_uid, timeout=300):

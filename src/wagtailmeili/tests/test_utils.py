@@ -4,7 +4,7 @@ from meilisearch.errors import MeilisearchApiError
 from requests import HTTPError
 from requests import Response
 
-from wagtailmeili.testapp.models import MoviePage
+from wagtailmeili.testapp.models import MoviePage, MoviePageWithManager
 from wagtailmeili.utils import (
     model_is_skipped,
     check_for_task_successful_completion,
@@ -39,6 +39,16 @@ class TestModelIsSkipped:
         ]
         for skip_models in variants:
             assert model_is_skipped(MoviePage, skip_models) is True
+
+    def test_proxy_of_skipped_model_is_skipped(self):
+        """Test that skipping a model also skips its proxy models"""
+        assert model_is_skipped(MoviePageWithManager, ['wagtailmeili_testapp.MoviePage']) is True
+
+    def test_skipping_a_proxy_does_not_skip_its_concrete_model(self):
+        """Test that skipping a proxy model leaves its concrete model indexed"""
+        skip_models = ['wagtailmeili_testapp.MoviePageWithManager']
+        assert model_is_skipped(MoviePageWithManager, skip_models) is True
+        assert model_is_skipped(MoviePage, skip_models) is False
 
     def test_invalid_input_cases(self):
         """Test various invalid inputs that should raise TypeError"""
