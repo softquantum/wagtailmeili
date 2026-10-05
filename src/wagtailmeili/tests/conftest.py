@@ -2,6 +2,7 @@ import json
 import logging
 import time
 import pytest
+import requests
 
 from pathlib import Path
 from wagtail.models import Page, Locale
@@ -168,6 +169,20 @@ def clean_meilisearch_index(meilisearch_backend):
     meilisearch_backend.delete_all_indexes()
     yield
     meilisearch_backend.delete_all_indexes()
+
+
+@pytest.fixture
+def meilisearch_requests(monkeypatch):
+    """Record every HTTP request sent while the test runs, as "METHOD /path" strings."""
+    sent = []
+    original_send = requests.Session.send
+
+    def record(session, request, **kwargs):
+        sent.append(f"{request.method} {request.path_url}")
+        return original_send(session, request, **kwargs)
+
+    monkeypatch.setattr(requests.Session, "send", record)
+    return sent
 
 
 @pytest.fixture
