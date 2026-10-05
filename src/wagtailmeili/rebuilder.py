@@ -210,9 +210,7 @@ class MeilisearchRebuilder:
     def _get_index_document_ids(self, index):
         """Get all document IDs currently in the index."""
         try:
-            # Use MeiliSearch's documents endpoint to get all IDs
-            documents = index.index.get_documents(fields=["id"])
-            return set(doc["id"] for doc in documents.results)
+            return index.get_document_ids()
         except Exception as e:
             logger.error(f"Failed to get index document IDs: {e}")
             return set()

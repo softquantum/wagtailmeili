@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import pytest
 
 from pathlib import Path
@@ -167,6 +168,21 @@ def clean_meilisearch_index(meilisearch_backend):
     meilisearch_backend.delete_all_indexes()
     yield
     meilisearch_backend.delete_all_indexes()
+
+
+@pytest.fixture
+def wait_for_meilisearch(meilisearch_backend):
+    """Return a callable that blocks until Meilisearch has no pending tasks."""
+    def wait(timeout=30):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            pending = meilisearch_backend.client.http.get("tasks?statuses=enqueued,processing&limit=1")
+            if not pending["results"]:
+                return
+            time.sleep(0.05)
+        raise TimeoutError("Meilisearch still has pending tasks")
+
+    return wait
 
 
 @pytest.fixture

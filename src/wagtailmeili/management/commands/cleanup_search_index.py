@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand
 from wagtail.search.backends import get_search_backend
 from wagtail.search.index import get_indexed_models
 
+from wagtailmeili.index import NullIndex
+
 
 class Command(BaseCommand):
     help = "Clean up stale documents from MeiliSearch index"
@@ -84,7 +86,7 @@ class Command(BaseCommand):
         """Clean up index for a specific model."""
         try:
             index = backend.get_index_for_model(model)
-            if index is None:
+            if isinstance(index, NullIndex):
                 self.stdout.write(f"No index found for {model.__name__}, skipping")
                 return 0
         except Exception as e:
@@ -106,8 +108,7 @@ class Command(BaseCommand):
 
             # Get current index documents
             try:
-                current_docs = index.index.get_documents(fields=["id"])
-                current_index_ids = {doc["id"] for doc in current_docs.results}
+                current_index_ids = index.get_document_ids()
             except Exception as e:
                 self.stdout.write(
                     self.style.WARNING(

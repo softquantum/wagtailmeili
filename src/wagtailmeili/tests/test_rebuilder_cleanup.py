@@ -70,34 +70,28 @@ def test_rebuilder_cleans_stale_documents_during_rebuild(test_movies_for_rebuild
 
 @pytest.mark.django_db
 def test_get_index_document_ids_returns_current_document_ids():
-    """Test that _get_index_document_ids returns current document IDs from index."""
+    """Test that _get_index_document_ids returns the document IDs reported by the index."""
     mock_index = MagicMock()
-    mock_documents = MagicMock()
-    mock_documents.results = [
-        {"id": "1"}, {"id": "2"}, {"id": "3"}
-    ]
-    mock_index.index.get_documents.return_value = mock_documents
-    
+    mock_index.get_document_ids.return_value = {"1", "2", "3"}
+
     rebuilder = MeilisearchRebuilder(mock_index)
-    
+
     result = rebuilder._get_index_document_ids(mock_index)
-    
-    expected_ids = {"1", "2", "3"}
-    assert result == expected_ids
-    
-    mock_index.index.get_documents.assert_called_once_with(fields=['id'])
+
+    assert result == {"1", "2", "3"}
+    mock_index.get_document_ids.assert_called_once_with()
 
 
 @pytest.mark.django_db
 def test_get_index_document_ids_handles_api_error():
     """Test that _get_index_document_ids handles API errors gracefully."""
     mock_index = MagicMock()
-    mock_index.index.get_documents.side_effect = Exception("API Error")
-    
+    mock_index.get_document_ids.side_effect = Exception("API Error")
+
     rebuilder = MeilisearchRebuilder(mock_index)
-    
+
     result = rebuilder._get_index_document_ids(mock_index)
-    
+
     assert result == set()
 
 

@@ -17,6 +17,8 @@ from wagtailmeili.utils import check_for_task_successful_completion, model_is_sk
 
 logger = logging.getLogger(__name__)
 
+DOCUMENT_IDS_PAGE_SIZE = 1000
+
 
 class IndexOperationStatus(StrEnum):
     SKIPPED: str = auto()
@@ -376,12 +378,23 @@ class MeilisearchIndex:
             logger.error(f"Error bulk deleting documents: {e}")
             raise
 
+    def get_document_ids(self) -> set[str]:
+        """Return the IDs of all documents in the index, as strings."""
+        document_ids = set()
+        offset = 0
+        while True:
+            page = self.index.get_documents(
+                {"fields": [self.primary_key], "offset": offset, "limit": DOCUMENT_IDS_PAGE_SIZE}
+            )
+            document_ids.update(str(getattr(doc, self.primary_key)) for doc in page.results)
+            offset += DOCUMENT_IDS_PAGE_SIZE
+            if offset >= page.total:
+                return document_ids
+
     def cleanup_stale_documents(self, live_pks) -> None:
         """Remove documents that shouldn't be in the index."""
         try:
-            # Get all document IDs currently in index
-            current_docs = self.index.get_documents(fields=["id"])
-            current_index_ids = {doc["id"] for doc in current_docs.results}
+            current_index_ids = self.get_document_ids()
 
             # Convert live_pks to set of strings (MeiliSearch uses string IDs)
             live_ids = {str(pk) for pk in live_pks}
