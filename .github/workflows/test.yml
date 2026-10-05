@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
 
@@ -69,7 +70,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           files: ./coverage.xml
           flags: unittests-${{ matrix.python-version }}
           name: Python ${{ matrix.python-version }}
